@@ -4,32 +4,51 @@ import { cite } from './refs';
 
 type Role = 'main' | 'secondary' | 'accessory';
 type Slot = [string, Role];
-export type Template = { kind: NonNullable<Session['kind']>; title: string; slots: Slot[] };
+export type Template = { kind: NonNullable<Session['kind']>; title: string; slots: Slot[]; style?: 'heavy' | 'volume' };
 
 const T: Record<string, Template> = {
-  fullA: { kind: 'full', title: 'Full body A', slots: [['squat', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['hinge', 'secondary'], ['lateral', 'accessory'], ['calves', 'accessory'], ['core', 'accessory'], ['biceps', 'accessory']] },
-  fullB: { kind: 'full', title: 'Full body B', slots: [['hinge', 'main'], ['vpull', 'main'], ['vpush', 'secondary'], ['lunge', 'secondary'], ['kneeFlex', 'accessory'], ['triceps', 'accessory'], ['core', 'accessory'], ['calves', 'accessory']] },
-  fullC: { kind: 'full', title: 'Full body C', slots: [['lunge', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['kneeFlex', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory'], ['biceps', 'accessory'], ['core', 'accessory']] },
-  upperA: { kind: 'upper', title: 'Parte superiore A', slots: [['hpush', 'main'], ['hpull', 'main'], ['vpush', 'secondary'], ['vpull', 'secondary'], ['lateral', 'accessory'], ['biceps', 'accessory'], ['triceps', 'accessory']] },
-  upperB: { kind: 'upper', title: 'Parte superiore B', slots: [['vpull', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['vpush', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory'], ['biceps', 'accessory']] },
-  lowerA: { kind: 'lower', title: 'Parte inferiore A', slots: [['squat', 'main'], ['hinge', 'main'], ['kneeFlex', 'secondary'], ['kneeExt', 'accessory'], ['calves', 'accessory'], ['core', 'accessory']] },
-  lowerB: { kind: 'lower', title: 'Parte inferiore B', slots: [['hinge', 'main'], ['lunge', 'main'], ['kneeExt', 'secondary'], ['kneeFlex', 'secondary'], ['calves', 'accessory'], ['core', 'accessory']] },
-  push: { kind: 'push', title: 'Spinta', slots: [['hpush', 'main'], ['vpush', 'main'], ['hpush', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory']] },
-  pull: { kind: 'pull', title: 'Tirata', slots: [['vpull', 'main'], ['hpull', 'main'], ['hpull', 'secondary'], ['biceps', 'accessory'], ['core', 'accessory']] },
-  legs: { kind: 'legs', title: 'Gambe', slots: [['squat', 'main'], ['hinge', 'main'], ['lunge', 'secondary'], ['kneeFlex', 'accessory'], ['calves', 'accessory'], ['core', 'accessory']] },
+  fullA: { kind: 'full', title: 'Full body A', slots: [['squat', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['kneeFlex', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory'], ['calves', 'accessory'], ['core', 'accessory']] },
+  fullB: { kind: 'full', title: 'Full body B', slots: [['hinge', 'main'], ['vpull', 'main'], ['vpush', 'secondary'], ['kneeExt', 'secondary'], ['fly', 'accessory'], ['biceps', 'accessory'], ['rearDelt', 'accessory'], ['core', 'accessory']] },
+  fullC: { kind: 'full', title: 'Full body C', slots: [['lunge', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['kneeFlex', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory'], ['biceps', 'accessory'], ['calves', 'accessory']] },
+  upperA: { kind: 'upper', style: 'heavy', title: 'Parte superiore · forza', slots: [['hpush', 'main'], ['hpull', 'main'], ['vpush', 'secondary'], ['vpull', 'secondary'], ['lateral', 'accessory'], ['triceps', 'accessory'], ['biceps', 'accessory']] },
+  upperB: { kind: 'upper', style: 'volume', title: 'Parte superiore · volume', slots: [['vpull', 'main'], ['hpush', 'main'], ['hpull', 'secondary'], ['fly', 'accessory'], ['lateral', 'accessory'], ['rearDelt', 'accessory'], ['biceps', 'accessory'], ['triceps', 'accessory']] },
+  lowerA: { kind: 'lower', style: 'heavy', title: 'Parte inferiore · forza', slots: [['squat', 'main'], ['hinge', 'main'], ['kneeFlex', 'secondary'], ['kneeExt', 'accessory'], ['calves', 'accessory'], ['core', 'accessory']] },
+  lowerB: { kind: 'lower', style: 'volume', title: 'Parte inferiore · volume', slots: [['hinge', 'main'], ['lunge', 'main'], ['kneeExt', 'secondary'], ['kneeFlex', 'secondary'], ['glute', 'accessory'], ['calves', 'accessory'], ['core', 'accessory']] },
+  push: { kind: 'push', title: 'Spinta', slots: [['hpush', 'main'], ['vpush', 'main'], ['hpush', 'secondary'], ['fly', 'accessory'], ['lateral', 'accessory'], ['triceps', 'accessory']] },
+  pull: { kind: 'pull', title: 'Tirata', slots: [['vpull', 'main'], ['hpull', 'main'], ['hpull', 'secondary'], ['rearDelt', 'accessory'], ['biceps', 'accessory'], ['biceps', 'accessory'], ['core', 'accessory']] },
+  legs: { kind: 'legs', title: 'Gambe', slots: [['squat', 'main'], ['hinge', 'main'], ['kneeExt', 'secondary'], ['kneeFlex', 'secondary'], ['glute', 'accessory'], ['calves', 'accessory']] },
+  glutes: { kind: 'legs', title: 'Glutei e femorali', slots: [['hinge', 'main'], ['glute', 'main'], ['lunge', 'secondary'], ['kneeFlex', 'secondary'], ['calves', 'accessory'], ['core', 'accessory']] },
+  full: { kind: 'full', title: 'Full body', slots: [['squat', 'main'], ['hpush', 'main'], ['vpull', 'secondary'], ['hinge', 'secondary'], ['lateral', 'accessory'], ['biceps', 'accessory'], ['triceps', 'accessory']] },
 };
-const upperFamilies = new Set(['hpush', 'vpush', 'hpull', 'vpull', 'lateral', 'biceps', 'triceps']);
-const lowerFamilies = new Set(['squat', 'hinge', 'lunge', 'kneeExt', 'kneeFlex', 'calves']);
+const upperFamilies = new Set(['hpush', 'vpush', 'hpull', 'vpull', 'lateral', 'biceps', 'triceps', 'fly', 'rearDelt']);
+const lowerFamilies = new Set(['squat', 'hinge', 'lunge', 'kneeExt', 'kneeFlex', 'calves', 'glute']);
 const levelIndex = (p: Profile) => (p.strengthLevel === 'new' ? 0 : p.strengthLevel === 'intermediate' ? 1 : 2);
 
-/** Split by number of gym days: full body up to 3, then upper/lower and push/pull/legs for trained lifters. */
+/**
+ * Split by gym days, level, goal and priority. From 2 days up every option trains each muscle about twice a week:
+ * with equal weekly volume splits give similar results, so the choice follows days, recovery and priorities.
+ */
 export function splitFor(p: Profile, sc: number): Template[] {
-  const full = [T.fullA, T.fullB, T.fullC];
-  const rotate = (n: number) => Array.from({ length: n }, (_, i) => full[i % 3]);
-  if (sc <= 3 || p.strengthLevel === 'new') return rotate(sc);
+  const rotate = (n: number) => Array.from({ length: n }, (_, i) => [T.fullA, T.fullB, T.fullC][i % 3]);
+  const lower = p.focus === 'lower', upper = p.focus === 'upper';
+  if (sc <= 2 || p.strengthLevel === 'new') return rotate(sc);
+  if (sc === 3) {
+    if (p.strengthLevel !== 'experienced' || p.goal === 'strength') return rotate(3);
+    return lower ? [T.lowerA, T.upperA, T.lowerB] : upper ? [T.upperA, T.lowerA, T.upperB] : [T.upperA, T.lowerA, T.full];
+  }
   if (sc === 4) return [T.upperA, T.lowerA, T.upperB, T.lowerB];
-  if (sc === 5) return [T.upperA, T.lowerA, T.push, T.pull, T.legs];
-  return [T.push, T.pull, T.legs, T.push, T.pull, T.legs].slice(0, sc);
+  if (sc === 5) return lower ? [T.lowerA, T.upperA, T.glutes, T.upperB, T.lowerB] : [T.upperA, T.lowerA, T.push, T.pull, T.legs];
+  return (lower ? [T.push, T.pull, T.legs, T.upperB, T.glutes, T.lowerB] : [T.push, T.pull, T.legs, T.push, T.pull, T.legs]).slice(0, sc);
+}
+
+/** Readable name of the chosen split. */
+export function splitName(templates: Template[]): string {
+  const kinds = templates.map(t => t.kind);
+  if (kinds.every(k => k === 'full')) return 'Corpo intero';
+  if (kinds.includes('push') && kinds.includes('upper')) return 'Superiore / inferiore + spinta, tirata, gambe';
+  if (kinds.includes('push')) return 'Spinta, tirata, gambe';
+  if (kinds.includes('full')) return 'Superiore / inferiore + corpo intero';
+  return 'Parte superiore / parte inferiore';
 }
 
 // Weekly sets per muscle at the start of a block (index: new / intermediate / experienced) and the ceiling reached by progression.
@@ -60,10 +79,18 @@ export function weeklyTargets(p: Profile, ctx: Context): Record<Muscle, number> 
   return out;
 }
 
-function reps(p: Profile, role: Role, fam: string, name: string): [number, number, 'reps' | 'seconds'] {
+function reps(p: Profile, role: Role, fam: string, name: string, style?: Template['style']): [number, number, 'reps' | 'seconds'] {
+  const base = repsBase(p, role, fam, name);
+  if (base[2] === 'reps' && role === 'main' && p.strengthLevel !== 'new' && p.goal !== 'strength' && fam !== 'plyo') {
+    if (style === 'heavy') return [5, 8, 'reps'];
+    if (style === 'volume') return [8, 12, 'reps'];
+  }
+  return base;
+}
+function repsBase(p: Profile, role: Role, fam: string, name: string): [number, number, 'reps' | 'seconds'] {
   if (fam === 'core') return /plank/i.test(name) ? (p.strengthLevel === 'new' ? [20, 30, 'seconds'] : [30, 45, 'seconds']) : [8, 12, 'reps'];
   if (fam === 'plyo') return [5, 8, 'reps'];
-  const small = ['lateral', 'biceps', 'triceps', 'calves'].includes(fam);
+  const small = ['lateral', 'biceps', 'triceps', 'calves', 'rearDelt', 'fly'].includes(fam);
   const runner = p.goal === 'running' && p.runningLevel !== 'new';
   if (p.goal === 'strength') return p.strengthLevel === 'new' ? (role === 'main' ? [6, 8, 'reps'] : [8, 12, 'reps']) : role === 'main' ? [3, 6, 'reps'] : role === 'secondary' ? [6, 10, 'reps'] : [8, 12, 'reps'];
   if (runner && role === 'main' && p.strengthLevel !== 'new') return [4, 6, 'reps'];
@@ -112,11 +139,13 @@ export function buildStrengthWeek(p: Profile, templates: Template[], ctx: Contex
   const maxSets = p.strengthLevel === 'new' ? 3 : p.strengthLevel === 'intermediate' ? 5 : 6;
   // Resolve variants first (some families are skipped for equipment or pain), then allocate exact weekly sets.
   type Entry = { si: number; k: number; fam: string; role: Role; name: string; sets: number };
+  const weekly: Record<string, number> = {};
   const entries: Entry[][] = plans.map(({ slots }, si) => {
     const used: Record<string, number> = {};
     return slots.flatMap(([fam, role]) => {
       const k = used[fam] = (used[fam] ?? -1) + 1;
-      const name = variantFor(p, fam, si + k);
+      const occurrence = weekly[fam] = (weekly[fam] ?? -1) + 1;
+      const name = variantFor(p, fam, occurrence, role);
       return name ? [{ si, k, fam, role, name, sets: fam === 'plyo' ? 2 : 0 }] : [];
     });
   });
@@ -126,19 +155,19 @@ export function buildStrengthWeek(p: Profile, templates: Template[], ctx: Contex
     const slots = flat.filter(e => e.fam !== 'plyo' && primary(e.fam) === m).sort((a, b) => roleOrder[a.role] - roleOrder[b.role] || a.si - b.si);
     if (!slots.length) return;
     const n = slots.length, baseSets = Math.floor(total / n);
-    slots.forEach((e, i) => { e.sets = Math.max(1, Math.min(maxSets, baseSets + (i < total - baseSets * n ? 1 : 0))); });
+    slots.forEach((e, i) => { e.sets = Math.max(e.role === 'main' ? 2 : 1, Math.min(maxSets, baseSets + (i < total - baseSets * n ? 1 : 0))); });
   };
   // Large muscles first; small muscles get their target minus the indirect work from compound lifts (fractional counting).
-  for (const m of ['quads', 'hamstrings', 'glutes', 'chest', 'back', 'calves', 'core'] as Muscle[]) allocate(m, targets[m]);
-  const indirect: Partial<Record<Muscle, number>> = {};
-  for (const e of flat) for (const [m, w] of Object.entries(families[e.fam].muscles)) if (w === 0.5) indirect[m as Muscle] = (indirect[m as Muscle] ?? 0) + e.sets * 0.5;
-  for (const m of ['shoulders', 'biceps', 'triceps'] as Muscle[]) allocate(m, Math.max(2, Math.round(targets[m] - (indirect[m] ?? 0))));
+  for (const m of ['quads', 'hamstrings', 'chest', 'back', 'calves', 'core'] as Muscle[]) allocate(m, targets[m]);
+  // Second pass: glutes, shoulders and arms already get work from compound lifts; their own exercises only fill the gap.
+  const already = (m: Muscle) => flat.filter(e => primary(e.fam) !== m).reduce((t, e) => t + e.sets * (families[e.fam].muscles[m] ?? 0), 0);
+  for (const m of ['glutes', 'shoulders', 'biceps', 'triceps'] as Muscle[]) allocate(m, Math.max(2, Math.round(targets[m] - already(m))));
   let trimmed = false;
   const sessions = plans.map(({ t }, si) => {
     const exs: Exercise[] = [];
     for (const { fam, role, name, k, sets: full } of entries[si]) {
       const sets = ctx.deload ? Math.max(1, Math.ceil(full / 2)) : full;
-      const [low, high, unit] = reps(p, role, fam, name);
+      const [low, high, unit] = reps(p, role, fam, name, t.style);
       const barbell = /bilanciere/i.test(name);
       exs.push({
         id: `${si}-${fam}-${k}`, name, family: fam, sets, low, high, unit, role,

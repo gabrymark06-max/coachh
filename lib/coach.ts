@@ -1,6 +1,8 @@
 import type { AppState, Paper } from './types';
 import { dayNames } from './types';
-import { nutrition, cite, activityFrom } from './planner';
+import { nutrition, cite, activityFrom, howTo, split as splitDays } from './planner';
+import { families } from './engine/exercises';
+import { splitFor, splitName } from './engine/strength';
 import { phaseNames } from './types';
 import evidence from './evidence.json';
 
@@ -40,6 +42,21 @@ export function answer(text: string, s: AppState): { text: string; sources: stri
   }
   if (/motiv|voglia|noia|ansia|stress|fiduci|ostacol|costanz|abitudin/.test(q)) return { text: `${p.name}, la costanza nasce da sedute semplici, stesso orario e progressi visibili: nelle prime settimane conta presentarsi più dello sforzo. ${p.goalDetail ? `Il tuo obiettivo: «${p.goalDetail}». ` : ''}Se una seduta non ti piace, scegli una variante equivalente; se manca tempo, fai la versione corta e registrala come parziale. Una giornata storta non cancella il percorso.`, sources: cite('habit', 'enjoyment') };
   if (/zon|ritmo|passo|frequenza cardiaca|battit|bpm|soglia/.test(q) && bp) return { text: 'Le tue zone, senza test di laboratorio:\n\n' + bp.zones.map(z => `${z.name}: ${z.talk} · ${z.rpe}${z.hr ? ` · circa ${z.hr}` : ''}. ${z.use}.`).join('\n') + '\n\nLa frequenza cardiaca deriva dalla formula 208 − 0,7 × età e ha un errore di circa ±10 battiti: il test del parlato è più affidabile.', sources: cite('zones') };
+  // Exercise technique: match any exercise name mentioned in the question.
+  const allNames = Object.values(families).flatMap(f => f.list.map(e => e.name));
+  const named = allNames.filter(n => q.includes(norm(n))).sort((a, b) => b.length - a.length)[0]
+    ?? (/come si fa|come eseguo|tecnica|esecuzione/.test(q) ? allNames.find(n => norm(n).split(' ').some(w => w.length > 4 && q.includes(w))) : undefined);
+  if (named) {
+    const h = howTo(named)!;
+    return { text: `${named}\n\nPosizione: ${h.setup}\n\n${h.steps.map((x, i) => `${i + 1}. ${x}`).join('\n')}\n\nErrori da evitare: ${h.mistakes.join(', ')}.\n\nRitmo: 2–3 secondi in discesa${h.stretch ? ', pausa di un secondo in allungamento' : ''}, salita decisa ma controllata. Fermati con le ripetizioni in riserva indicate nella scheda.`, sources: cite('exerciseScience', 'effort') };
+  }
+  if (/split|scheda|divid|push|pull|legs|full ?body|superiore|inferiore/.test(q) && p) {
+    const { sc } = splitDays(p);
+    const name = splitName(splitFor(p, sc));
+    return { text: `Il tuo split: ${name.toLowerCase()}, ${sc} sedute di palestra.\n\nCome scelgo: 2–3 giorni → corpo intero; 4 giorni → superiore/inferiore (una seduta di forza e una di volume per metà corpo); 5 giorni → superiore/inferiore + spinta, tirata, gambe; 6 giorni → spinta, tirata, gambe due volte. Chi inizia fa sempre corpo intero. A parità di serie settimanali gli split danno risultati simili: conta allenare ogni muscolo almeno due volte e recuperare.`, sources: cite('splitChoice', 'frequency') };
+  }
+  if (/esercizi|esercizio migliore|migliori esercizi|quale esercizio/.test(q)) return { text: 'Per ogni muscolo uso un multiarticolare più un isolamento, preferendo quelli che lo allungano sotto carico:\n\n• Gambe: squat sotto il parallelo o hack squat/pressa, stacco rumeno, leg extension (unica per il retto femorale), leg curl da seduto.\n• Glutei: squat profondo e hip thrust se sono una priorità.\n• Petto: panca piana e panca inclinata alternate, croci ai cavi.\n• Dorso: lat machine o trazioni, rematore con supporto o al cavo.\n• Spalle: shoulder press, alzate laterali (manubri o cavo uguali), face pull.\n• Braccia: curl su panca inclinata o Scott, estensioni dei tricipiti sopra la testa.\n• Polpacci: calf raise con pausa in basso.\n\nChi inizia parte da macchine e varianti stabili.', sources: cite('exerciseScience', 'singleJoint', 'exerciseChoice') };
+  if (/quante serie|quante ripetiz|ripetizioni|range/.test(q)) return { text: `${p?.goal === 'strength' ? 'Per la forza: esercizi principali 3–6 ripetizioni con recuperi di 2–3 minuti, accessori 6–12.' : 'Per crescere: multiarticolari 6–10 ripetizioni, isolamento 10–20; carichi diversi funzionano se arrivi a 1–3 ripetizioni dal cedimento.'}\n\nSerie: circa 8–12 a settimana per muscolo per chi è intermedio, da 6–8 per chi inizia fino a 15–20 per chi è avanzato, divise su due sedute. Aggiungo una serie per muscolo a settimana se recuperi bene; ogni 4–5 settimane uno scarico.`, sources: cite('repRanges', 'volume', 'effort') };
   if (/ricompos|massa|bulk|definiz|dimagr|cut|fase|grasso corporeo|vita|circonferenza/.test(q)) {
     const n = nutrition(p, activityFrom(p, plan));
     if (n.blocked) return { text: n.reason, sources: n.sources };

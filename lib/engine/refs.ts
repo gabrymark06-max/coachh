@@ -59,6 +59,11 @@ export const R = {
   reds: p('37752011', '32661127'),
   weighing: p('25521523', '33762040'),
   dietPattern: p('28488692', '26024494'),
+  // Gym expertise: splits, exercise selection, reps
+  splitChoice: p('38595233', '34468591', '30236847', '25932981'),
+  exerciseScience: p('35819335', '33009197', '31230110', '41630124', '37015016', '36828324', '32922646', '37877099', '40276368', '40692697'),
+  repRanges: p('33433148', '28834797', '41843416'),
+  singleJoint: p('26244600', '41630124'),
   // Body recomposition and fat loss
   cardioFatLoss: p('19127177', '42144246', '28513103', '17848941'),
   steps: p('35247352', '33239350'),

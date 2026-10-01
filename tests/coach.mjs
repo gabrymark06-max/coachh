@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 const out = path.resolve('.test-build');
 await build({ entryPoints: { engine: 'tests/entry.ts' }, bundle: true, format: 'esm', platform: 'node', outdir: out, outExtension: { '.js': '.mjs' }, logLevel: 'error' });
 const E = await import(pathToFileURL(path.join(out, 'engine.mjs')).href + '?' + Date.now());
-const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split } = E;
+const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split, howTo } = E;
 const evidence = new Set(JSON.parse(fs.readFileSync('lib/evidence.json', 'utf8')).map(p => p.id));
 
 const base = { name: 'Test', age: 28, sex: 'male', weight: 80, height: 178, waist: 88, goal: 'recomp', strengthLevel: 'intermediate', runningLevel: 'new', days: [0, 2, 4], minutes: 60, equipment: 'gym', recentRunMinutes: 0, recentLongest: 0, activity: 'low', diet: 'omnivore', restrictions: '', clinical: false, pain: false, nutritionConsent: true, steps: 5500, cardio: [], mealsPerDay: 4, trainingTime: 'evening', allergens: [] };
@@ -20,7 +20,7 @@ function checkPlan(plan, p, label) {
     assert(s.duration > 0, label + ': duration');
     assert(s.duration <= (s.kind === 'long' ? longCap : p.minutes), `${label}: time ${s.title} ${s.duration}>${p.minutes}`);
     assert.equal(s.duration, s.type === 'run' ? s.phases.reduce((t, x) => t + x.minutes, 0) : s.duration, label + ': cardio phases add up');
-    if (s.type === 'strength') assert(s.exercises.length >= 2, label + ': exercises');
+    if (s.type === 'strength') { assert(s.exercises.length >= 2, label + ': exercises'); for (const e of s.exercises) assert(howTo(e.name)?.steps.length, `${label}: missing technique for ${e.name}`); }
     for (const id of s.sources) { assert(evidence.has(id), `${label}: unknown source ${id}`); sources.add(id); }
   }
   for (const r of plan.blueprint.pillars) for (const id of r.sources) { assert(evidence.has(id), `${label}: pillar source ${id}`); sources.add(id); }
@@ -59,6 +59,26 @@ const bulk = generatePlan({ ...base, goal: 'muscle', waist: 78, days: [0, 2, 4] 
 assert(bulk.progress.cardioMinutes < fl.progress.cardioMinutes, 'Less cardio when gaining muscle than when losing fat');
 assert(fl.progress.steps > base.steps, 'Step target above current steps');
 console.log('Gym first: split, cardio modality, finishers, dose by goal and steps passed.');
+
+
+// 2b. Gym expertise: split by days/level/focus and evidence-based exercise choices.
+const kinds = p => [...new Set(generatePlan(p).sessions.filter(x => x.type === 'strength').map(x => x.kind))].sort().join(',');
+assert.equal(kinds({ ...base, strengthLevel: 'new', days: [0, 2, 4, 5] }), 'full', 'Beginners: full body');
+assert.equal(kinds({ ...base, days: [0, 1, 3, 4] }), 'lower,upper', '4 days: upper/lower');
+assert.equal(kinds({ ...base, goal: 'muscle', days: [0, 1, 2, 3, 4] }), 'legs,lower,pull,push,upper', '5 days: UL + PPL');
+assert.equal(kinds({ ...base, goal: 'muscle', strengthLevel: 'experienced', days: [0, 1, 2, 3, 4, 5] }), 'legs,pull,push', '6 days: PPL x2');
+assert(generatePlan({ ...base, goal: 'muscle', focus: 'lower', days: [0, 1, 2, 3, 4] }).sessions.some(x => x.title === 'Glutei e femorali'), 'Lower focus: glute day');
+const names = p => generatePlan(p).sessions.flatMap(x => x.exercises.map(e => e.name));
+const gymNames = names({ ...base, goal: 'muscle', days: [0, 1, 3, 4] });
+assert(gymNames.includes('Leg curl seduto'), 'Seated leg curl preferred');
+assert(gymNames.includes('Estensioni sopra la testa al cavo'), 'Overhead triceps extension preferred');
+assert(gymNames.includes('Leg extension'), 'Leg extension for the rectus femoris');
+assert(names({ ...base, goal: 'strength', strengthLevel: 'experienced', days: [0, 2, 4] }).some(n => /bilanciere|Stacco da terra/.test(n)), 'Strength: barbell main lifts');
+assert(!names({ ...base, strengthLevel: 'new' }).includes('Squat con bilanciere'), 'Beginners: no barbell squat yet');
+assert(names({ ...base, equipment: 'bodyweight', days: [0, 2, 4] }).every(n => howTo(n)), 'Bodyweight technique available');
+const bp = generatePlan({ ...base, days: [0, 1, 3, 4] }).blueprint;
+assert(bp.pillars.some(x => x.title.startsWith('Lo split')) && bp.pillars.some(x => x.title === 'Perché questi esercizi') && bp.pillars.some(x => x.title === 'Serie e ripetizioni'));
+console.log('Gym expertise: splits, focus, exercise selection, strength lifts, beginner safety and technique passed.');
 
 // 3. Body fat and auto goal.
 assert.equal(bodyFat({ ...base, height: 180, waist: 90 }), 24);
@@ -153,6 +173,10 @@ console.log('Store: profile, validation, logging, check-in, week, chat and reset
 // 9. Coach answers.
 const cs = { profile: base, plan: generatePlan(base), logs: [], checkins: [], decisions: [], messages: [], revision: 0 };
 for (const q of ['Cosa faccio oggi?', 'Perché questa fase della dieta?', 'Quante proteine?', 'Devo fare cardio?', 'Lo stretching serve?']) assert(answer(q, cs).text.length > 40, q);
+assert(answer('Come si fa lo stacco rumeno con manubri?', cs).text.includes('Errori da evitare'));
+assert(answer('Che split devo fare?', cs).text.includes('split'));
+assert(answer('Quali sono i migliori esercizi per le gambe?', cs).text.includes('leg curl'));
+assert(answer('Quante ripetizioni devo fare?', cs).text.includes('ripetizioni'));
 assert(sources.size >= 90, 'Broad evidence use: ' + sources.size);
 console.log(`Coach answers passed. ${sources.size} distinct studies behind the generated plans.`);
 fs.rmSync(out, { recursive: true, force: true });
