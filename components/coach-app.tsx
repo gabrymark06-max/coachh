@@ -212,7 +212,7 @@ export default function CoachApp() {
 
         {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} onEdit={() => setEdit(true)} onNext={() => { if (confirm('Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
 
-        {!reveal && tab === 'food' && p && n && <Diet n={n} p={p} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} add={e => act({ type: 'food', data: e })} remove={id => act({ type: 'foodDelete', data: id })} />} />}
+        {!reveal && tab === 'food' && p && n && <Diet n={n} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} add={e => act({ type: 'food', data: e })} remove={id => act({ type: 'foodDelete', data: id })} />} />}
 
         {!reveal && tab === 'progress' && <Progress state={s} add={() => setMeasure('new')} edit={m => setMeasure(m)} remove={m => { if (confirm(`Eliminare la misurazione del ${new Date(m.date + 'T12:00:00').toLocaleDateString('it-IT')}${Object.keys(m.photos).length ? ' e le sue foto' : ''}?`)) { act({ type: 'measureDelete', data: m.id }); deletePhotos(Object.values(m.photos)); } }} />}
 
@@ -322,50 +322,22 @@ function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s: Sessi
   </>;
 }
 
-function Diet({ n, p, dayKind, setDayKind, edit, diary }: { n: NutritionPlan; p: Profile; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void; diary: ReactNode }) {
+function Diet({ n, dayKind, setDayKind, edit, diary }: { n: NutritionPlan; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void; diary: ReactNode }) {
   if (n.blocked) return <><Heading label="Dieta" title="Alimentazione." description="" /><section className="panel notice"><h2>Piano alimentare non attivo</h2><p>{n.reason}</p><button className="primary" onClick={edit}>Modifica risposte</button></section></>;
-  const m = dayKind === 'training' ? n.training : n.rest;
   const meals = n.meals ? (dayKind === 'training' ? n.meals.training : n.meals.rest) : [];
-  const tot = meals.reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { kcal: 0, p: 0, c: 0, f: 0 });
-  const w = n.timeline;
-  const span = w.length ? Math.max(0.5, Math.max(...w.map(x => x.weight)) - Math.min(...w.map(x => x.weight))) : 1;
   return <>
-    <Heading label="Dieta" title={`Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.phaseReason}>
+    <Heading label="Dieta" title={`Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.weeklyChange ?? ''}>
       <button className="secondary" onClick={edit}>Modifica risposte</button>
     </Heading>
     {diary}
-    <div className="sectionheading" style={{ marginTop: 32 }}><h2>Il tuo piano alimentare</h2></div>
-    <div className="dietgrid">
-      <section className="panel phasecard">
-        <div className="eyebrow">Obiettivo settimanale</div>
-        <h2>{n.weeklyChange ?? '—'}</h2>
-        {n.bodyFat !== null && <p>Grasso corporeo stimato: <b>{n.bodyFat.toLocaleString('it-IT')}%</b></p>}
-        {w.length > 1 && p.weight && <div className="timeline">{w.map(x => <div key={x.week} className="tl"><span className="bar" style={{ height: `${30 + (x.weight - Math.min(...w.map(y => y.weight))) / span * 60}%` }} /><b className="num">{x.weight.toLocaleString('it-IT')}</b><small>{x.week ? `sett. ${x.week}` : 'oggi'}</small></div>)}</div>}
-        <p className="note">Previsione indicativa: la verifichiamo con la media del peso ogni settimana.</p>
-      </section>
-      <section className="panel">
-        <div className="sectionheading"><h2>Obiettivi del giorno</h2>
-          <div className="segmented"><button aria-pressed={dayKind === 'training'} onClick={() => setDayKind('training')}>Allenamento</button><button aria-pressed={dayKind === 'rest'} onClick={() => setDayKind('rest')}>Riposo</button></div></div>
-        {m ? <MacroRow m={m} /> : <p>{n.reason}</p>}
-        <div className="minis">
-          {n.fiber && <div><b className="num">{n.fiber} g</b><span>fibre</span></div>}
-          {n.water && <div><b className="num">{n.water.toLocaleString('it-IT')} l</b><span>acqua</span></div>}
-          {n.tdee && <div><b className="num">{n.tdee}</b><span>kcal di mantenimento</span></div>}
-        </div>
-      </section>
-    </div>
     {meals.length > 0 && <>
-      <div className="sectionheading" style={{ marginTop: 28 }}><h2>Giornata tipo · {dayKind === 'training' ? 'allenamento' : 'riposo'}</h2><small className="num">{tot.kcal} kcal · P {tot.p} · C {tot.c} · G {tot.f}</small></div>
+      <div className="sectionheading" style={{ marginTop: 28 }}><h2>Giornata tipo</h2>
+        <div className="segmented"><button aria-pressed={dayKind === 'training'} onClick={() => setDayKind('training')}>Allenamento</button><button aria-pressed={dayKind === 'rest'} onClick={() => setDayKind('rest')}>Riposo</button></div></div>
       <div className="meals">{meals.map((meal, i) => <article className="meal" key={i}>
         <header><h3>{meal.name}</h3><small className="num">{meal.kcal} kcal · {meal.p} g proteine</small></header>
         <ul>{meal.items.map((it, k) => <li key={k}><b className="num">{it.grams} g</b><span>{it.food}</span></li>)}</ul>
       </article>)}</div>
-      <p className="note">Grammature indicative: pesa a crudo pasta, riso, cereali, carne e pesce. Puoi cambiare gli alimenti con quelli equivalenti qui sotto.</p>
     </>}
-    {n.swaps.length > 0 && <section className="panel block"><h2>Sostituzioni equivalenti</h2><div className="swaps">{n.swaps.map(g => <div key={g.group}><h3>{g.group}</h3><ul>{g.items.map(x => <li key={x}>{x}</li>)}</ul></div>)}</div></section>}
-    <div className="sectionheading" style={{ marginTop: 28 }}><h2>Come farla funzionare</h2></div>
-    <div className="pillars">{n.tips.map(t => <div className="pillar" key={t.title}><h3>{t.title}</h3><p>{t.text}</p></div>)}</div>
-    <p className="note" style={{ marginTop: 16 }}>{n.reason}</p>
   </>;
 }
 
