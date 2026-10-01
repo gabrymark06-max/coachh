@@ -40,7 +40,7 @@ Senza chiave la chat risponde con le regole locali e lo segnala sotto ogni rispo
 
 ## Account e dati (Supabase)
 
-Con Supabase configurato, all'avvio compare la pagina di accesso: Google, Apple oppure email e password.
+Con Supabase configurato, all'avvio compare la pagina di accesso: Google oppure email e password.
 
 - Piano, diario e misure vengono salvati nella tabella `app_state`, una riga per utente.
 - Le foto vanno nel bucket privato `photos`.
@@ -53,7 +53,7 @@ Configurazione:
 1. Esegui `supabase/schema.sql` nell'editor SQL di Supabase.
 2. Su Vercel aggiungi `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (la chiave pubblica, *publishable* o *anon*).
 3. In Supabase, *Authentication → URL Configuration*, imposta l'URL del sito come *Site URL* e come *Redirect URL*.
-4. Attiva i provider in *Authentication → Providers*: Email è attivo di default; Google richiede un client OAuth di Google Cloud; Apple richiede l'Apple Developer Program.
+4. Attiva i provider in *Authentication → Providers*: Email è attivo di default; Google richiede un client OAuth di Google Cloud.
 
 Senza queste variabili l'app funziona senza account e i dati restano nel browser (`localStorage` e IndexedDB).
 

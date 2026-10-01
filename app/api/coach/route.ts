@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: 'not-configured' }, { status: 503 });
   // With login configured, only signed-in users can spend the Gemini quota.
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (sbUrl && sbKey) {
     const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
     const user = token ? await fetch(`${sbUrl}/auth/v1/user`, { headers: { apikey: sbKey, Authorization: `Bearer ${token}` } }).catch(() => null) : null;
