@@ -114,7 +114,10 @@ export function nutrition(p: Profile, activity: Activity = { gymDays: Math.max(1
   out.fat = fat; out.carbs = carbs; out.carbsPerKg = [Math.round(carbs / w * 10) / 10, Math.round((carbs + deltaT) / w * 10) / 10];
   out.fiber = Math.round(target / 1000 * 14);
   out.water = Math.round((w * 0.035 + 0.5) * 10) / 10;
-  out.meals = { training: sampleDay(p, out.training, 0, true), rest: sampleDay(p, out.rest, 2, false) };
+  const trainingDay = sampleDay(p, out.training, 0, true), restDay = sampleDay(p, out.rest, 2, false);
+  const kcalOf = (day: Meal[]) => day.reduce((t, m) => t + m.kcal, 0);
+  // A rest day never shows more food than a training day: with equal targets, or when portion floors keep it high, reuse the training day.
+  out.meals = { training: trainingDay, rest: out.rest.kcal >= out.training.kcal || kcalOf(restDay) > kcalOf(trainingDay) ? trainingDay : restDay };
   out.swaps = swaps(p);
   out.reason = `Fabbisogno stimato ${r10(tdee)} kcal: equazione di Mifflin-St Jeor (errore individuale ±10%) per un fattore che conta lavoro, ${activity.gymDays} sedute di palestra, ${activity.cardioMinutes} minuti di cardio e ${activity.steps.toLocaleString('it-IT')} passi. Non sommare le calorie dello smartwatch: sono già comprese.`;
   out.sources = cite('energyEstimate', 'protein', rec.phase === 'cut' ? 'deficit' : rec.phase === 'gain' ? 'surplus' : 'recomposition', 'bodyFat');

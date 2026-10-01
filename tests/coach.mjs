@@ -212,6 +212,14 @@ for (const variant of [{}, { diet: 'vegetarian' }, { diet: 'vegan' }, { allergen
   }
   for (const t of n.tips) for (const id of t.sources) { assert(evidence.has(id)); sources.add(id); }
 }
+for (const weight of [60, 80, 100]) for (const days of [[0, 2, 4], [0, 1, 3, 4, 5], [0, 1, 2, 3, 4, 5]]) for (const goal of ['recomp', 'muscle', 'fat-loss']) for (const diet of ['omnivore', 'vegan']) for (const sex of ['male', 'female']) {
+  const p = { ...base, weight, days, goal, diet, sex, height: sex === 'female' ? 165 : 180 };
+  const n = nutrition(p, activityFrom(p, generatePlan(p)));
+  if (n.blocked || !n.meals) continue;
+  const kcal = d => d.reduce((t, m) => t + m.kcal, 0), t = kcal(n.meals.training), r = kcal(n.meals.rest);
+  assert(r <= t, `Rest day sample not above training day: ${JSON.stringify({ weight, days: days.length, goal, diet, sex, t, r })}`);
+  assert(Math.abs(t - n.training.kcal) <= n.training.kcal * 0.08, `Training sample day near target: ${t} vs ${n.training.kcal}`);
+}
 console.log('Nutrition: phases, deficit/surplus, carb cycling, sample days on target, diets and allergens passed.');
 
 // 8. Client store (no server).

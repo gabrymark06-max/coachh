@@ -155,7 +155,33 @@ export function sampleDay(p: Profile, target: Macros, variant: number, training:
     if (second) used.add(second.name);
     meals.push(build(m, [{ food: prot, grams: mainGrams }, extra, { food: carb, grams: round5(Math.min(carb && carb.c < 30 ? 700 : 200, cg)) }, { food: veg, grams: vegG }, { food: oil, grams: round5(og) }]));
   });
-  return meals;
+  return calibrate(meals, target);
+}
+
+/** Minimum portions, legume portions and rounding push the day off target. Bring it back in three steps:
+ * protein foods down to the protein target, added fats to the fat target, then starches (and fruit) to the calorie target. */
+function calibrate(meals: Meal[], target: Macros): Meal[] {
+  const food = (name: string) => F.find(f => f.name === name)!;
+  const starch = (f: Food) => (f.role.includes('carb') || f.role.includes('fruit')) && !f.role.includes('protein');
+  const protein = (f: Food) => f.role.includes('protein');
+  const added = (f: Food) => f.role.includes('fat');
+  const totals = (list: Meal[]) => list.reduce((t, m) => ({ kcal: t.kcal + m.kcal, p: t.p + m.p, f: t.f + m.f }), { kcal: 0, p: 0, f: 0 });
+  const from = (list: Meal[], pred: (f: Food) => boolean, key: 'p' | 'f' | 'kcal') => list.flatMap(m => m.items).reduce((t, i) => { const f = food(i.food); return t + (pred(f) ? f[key] * i.grams / 100 : 0); }, 0);
+  const ratio = (gap: number, base: number, lo: number, hi: number) => base > 0 ? Math.min(hi, Math.max(lo, 1 + gap / base)) : 1;
+  const scale = (list: Meal[], pred: (f: Food) => boolean, k: number) => k === 1 ? list : list.map(m => build(m.name, m.items.map(i => {
+    const f = food(i.food);
+    return { food: f, grams: pred(f) ? Math.max(f.name.startsWith('olio') ? 5 : 0, round5(i.grams * k)) : i.grams, note: i.note };
+  })));
+  let out = meals;
+  for (let pass = 0; pass < 3; pass++) {
+    let t = totals(out);
+    if (t.p > target.protein * 1.05) out = scale(out, protein, ratio(target.protein - t.p, from(out, protein, 'p'), 0.6, 1));
+    t = totals(out);
+    out = scale(out, added, ratio(target.fat - t.f, from(out, added, 'f'), 0.3, 1.6));
+    t = totals(out);
+    out = scale(out, starch, ratio(target.kcal - t.kcal, from(out, starch, 'kcal'), 0.4, 1.5));
+  }
+  return out;
 }
 
 /** Equivalent portions: same protein (or carbohydrate) as the reference food. */
