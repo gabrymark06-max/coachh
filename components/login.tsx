@@ -93,7 +93,7 @@ export function Login({ recovery = false, done }: { recovery?: boolean; done?: (
         {mode === 'signin' && <><button type="button" className="ghost" onClick={() => { setMode('signup'); setError(''); setInfo(''); }}>Non hai un account? Registrati</button><button type="button" className="ghost muted" onClick={() => { setMode('reset'); setError(''); setInfo(''); }}>Password dimenticata?</button></>}
         {(mode === 'signup' || mode === 'reset') && <button type="button" className="ghost" onClick={() => { setMode('signin'); setError(''); }}>Hai già un account? Accedi</button>}
       </div>
-      <small className="fine">Per adulti. Continuando accetti che i tuoi dati di allenamento siano salvati nel tuo account per far funzionare il coach.</small>
+      <small className="fine">Per adulti. Continuando accetti i <a href="/termini">termini di servizio</a> e l’<a href="/privacy">informativa sulla privacy</a>.</small>
     </section>
   </div>;
 }

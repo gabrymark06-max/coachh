@@ -512,6 +512,20 @@ footer { max-width: 1240px; margin: 0 auto; padding: 20px 40px 36px; color: var(
   .loginform { justify-content: flex-start; padding-top: 32px; }
 }
 
+/* ---------- Legal pages ---------- */
+.legal { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+.legal header { margin-bottom: 32px; }
+.legal article { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(22px, 4vw, 40px); box-shadow: var(--shadow); }
+.legal h1 { font-size: clamp(30px, 5vw, 42px); }
+.legal h2 { margin: 26px 0 6px; font-size: 19px; }
+.legal p, .legal li { font-size: 15.5px; color: #3D4750; }
+.legal ul { padding-left: 20px; margin: 6px 0; }
+.legal li { margin: 6px 0; }
+.legal a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.legal .brand { text-decoration: none; color: var(--ink); }
+.legalnav { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); }
+.loginform .fine a { color: inherit; text-decoration: underline; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   .grid2, .today, .dietgrid { grid-template-columns: 1fr; }
