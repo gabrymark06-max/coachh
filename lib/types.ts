@@ -76,7 +76,7 @@ export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 /** One food eaten: nutrition per 100 g plus the grams eaten. */
 export type FoodEntry = {
   id: string; date: string; meal: MealSlot; name: string; brand?: string; grams: number;
-  kcal: number; p: number; c: number; f: number; code?: string; source: 'barcode' | 'search' | 'generic' | 'photo' | 'manual' | 'recent';
+  kcal: number; p: number; c: number; f: number; code?: string; source: 'barcode' | 'search' | 'generic' | 'photo' | 'label' | 'manual' | 'recent';
 };
 export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number };
 export type Paper = { id: string; title: string; authors: string; year: number; doi: string; pmid: string; url: string; topics: string[]; study_type: string; population: string; finding: string; limitations: string; coach_use: string; access_level: string; oa_full_text_url: string; collections: string[] };

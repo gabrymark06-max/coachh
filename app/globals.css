@@ -606,6 +606,20 @@ footer { max-width: 1240px; margin: 0 auto; padding: 20px 40px 36px; color: var(
 .qtymacros b { font-size: 18px; }
 .qtyactions { display: flex; gap: 10px; }
 .qtyactions .primary { flex: 1; }
+.secondary.full { width: 100%; justify-content: center; }
+.missing { display: flex; flex-direction: column; gap: 8px; background: var(--steel); border-radius: 14px; padding: 14px; }
+.missing p { font-size: 14px; color: var(--muted); }
+.dish { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.dish b { font-family: var(--display); font-size: 18px; }
+.dish small { color: var(--muted); font-size: 13px; }
+.guess .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.guess .tags i { font-style: normal; font-size: 11px; border-radius: 99px; padding: 1px 8px; background: var(--steel); color: var(--muted); }
+.guess .tags i.conf.bassa { background: var(--straw); color: var(--straw-ink); }
+.gramsedit { display: flex; align-items: center; gap: 4px; }
+.gramsedit .gramsin input { width: 64px; }
+.refine { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.refine .question { font-weight: 600; font-size: 14px; }
+@media (max-width: 360px) { .gramsedit .iconbtn { display: none; } }
 @media (max-width: 1100px) { .mealgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
   .mealgrid { grid-template-columns: 1fr; }

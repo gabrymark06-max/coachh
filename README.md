@@ -21,9 +21,10 @@ Tempra ti fa un questionario e costruisce un piano completo per **dimagrire, far
   - foto (fronte, lato, dietro) con confronto prima/dopo, affiancato o a scorrimento.
 - **Dieta:** fase, calorie, macronutrienti, giornata tipo e correzioni dalla media del peso.
 - **Diario alimentare:**
-  - codice a barre con la fotocamera (Open Food Facts);
-  - ricerca tra oltre 100 alimenti comuni e i prodotti di marca;
-  - foto del piatto riconosciuta da Gemini, con i grammi da confermare;
+  - codice a barre con la fotocamera: prodotti aggiunti dagli utenti, poi Open Food Facts; se manca, si fotografa l'etichetta e il prodotto resta salvato per tutti (`supabase/products.sql`);
+  - ricerca tra 350 alimenti comuni (anche piatti pronti italiani e fast food) e i prodotti di marca;
+  - foto del piatto con Gemini: scompone il piatto, stima le porzioni con oggetti di riferimento, prende i valori dalla tabella degli alimenti quando c'è la voce giusta, accetta una descrizione e le correzioni;
+  - lettura della tabella nutrizionale da foto;
   - quantità in grammi e totali del giorno confrontati con gli obiettivi.
   - Il coach in chat e la revisione settimanale usano quello che registri.
 - **Coach in chat con Gemini (Google AI):** risponde usando il tuo piano, i carichi, il diario, le misure e gli studi più pertinenti.

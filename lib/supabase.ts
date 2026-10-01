@@ -55,3 +55,9 @@ export async function deleteRemote(userId: string) {
   const { data } = await supabase.storage.from('photos').list(userId, { limit: 1000 });
   if (data?.length) await supabase.storage.from('photos').remove(data.map(f => `${userId}/${f.name}`));
 }
+
+/** Shares a product read from its label, so the next scan of this barcode finds it for everyone. Best effort: a missing table or a duplicate is ignored. */
+export async function shareProduct(p: { code: string; name: string; brand?: string; kcal: number; p: number; c: number; f: number; serving?: number }) {
+  if (!supabase || !(await currentUserId())) return;
+  await supabase.from('products').insert({ code: p.code, name: p.name.slice(0, 120), brand: p.brand?.slice(0, 80) ?? null, kcal: p.kcal, p: p.p, c: p.c, f: p.f, serving: p.serving ?? null }).then(() => undefined, () => undefined);
+}

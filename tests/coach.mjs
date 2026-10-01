@@ -241,7 +241,8 @@ s = apply(s, { type: 'measureDelete', data: s.measurements[0].id }); assert.equa
 assert(searchGeneric('pollo').some(f => /pollo/i.test(f.name)), 'Generic search');
 assert(searchGeneric('yog gre')[0].name.startsWith('Yogurt greco'), 'Prefix search across words');
 assert(searchGeneric('caffe').length >= 1, 'Accent-insensitive search');
-for (const f of genericFoods.filter(x => !/Birra|Vino|chia/.test(x.name))) { const k = f.p * 4 + f.c * 4 + f.f * 9; assert(Math.abs(k - f.kcal) <= Math.max(25, f.kcal * 0.2), `Macros match kcal for ${f.name}: ${k} vs ${f.kcal}`); }
+for (const f of genericFoods.filter(x => !/Birra|Vino|Prosecco|Spritz|Gin|Superalcolico|chia/.test(x.name))) { const k = f.p * 4 + f.c * 4 + f.f * 9; assert(Math.abs(k - f.kcal) <= Math.max(25, f.kcal * 0.2), `Macros match kcal for ${f.name}: ${k} vs ${f.kcal}`); }
+assert.equal(new Set(genericFoods.map(f => f.name.toLowerCase())).size, genericFoods.length, "Food names are unique");
 assert.deepEqual(forGrams({ kcal: 355, p: 12, c: 72, f: 1.5 }, 80), { kcal: 284, p: 9.6, c: 57.6, f: 1.2 });
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
 s = apply(s, { type: 'food', data: { date: today, meal: 'lunch', name: 'Pasta di semola (cruda)', grams: 80, kcal: 355, p: 12, c: 72, f: 1.5, source: 'generic' } });

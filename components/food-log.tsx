@@ -1,12 +1,12 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- product thumbnails come from Open Food Facts and local blob: URLs */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, ScanBarcode, Camera, Search, History, Trash2, PenLine, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, ScanBarcode, Camera, Search, History, Trash2, PenLine, Check, FileText, RefreshCw } from 'lucide-react';
 import type { AppState, FoodEntry, MealSlot, Plan } from '../lib/types';
 import { mealNames } from '../lib/types';
 import type { NutritionPlan } from '../lib/planner';
 import { searchGeneric, forGrams, type FoodItem } from '../lib/foods';
-import { accessToken } from '../lib/supabase';
+import { accessToken, shareProduct } from '../lib/supabase';
 import { Modal } from './modal';
 
 type Add = (e: Omit<FoodEntry, 'id'> & { id?: string }) => boolean;
@@ -17,6 +17,23 @@ const fmt = (x: number) => Math.round(x).toLocaleString('it-IT');
 const sum = (list: FoodEntry[]) => list.reduce((t, e) => { const m = forGrams(e, e.grams); return { kcal: t.kcal + m.kcal, p: t.p + m.p, c: t.c + m.c, f: t.f + m.f }; }, { kcal: 0, p: 0, c: 0, f: 0 });
 /** Meal slot that fits the current hour. */
 const slotNow = (): MealSlot => { const h = Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Europe/Rome' })); return h < 11 ? 'breakfast' : h < 15 ? 'lunch' : h < 18 ? 'snack' : 'dinner'; };
+
+/** Photo shrunk to a JPEG data URL: big enough for the model to see portions and small print, small enough to upload quickly. */
+async function shrink(file: File, max: number, quality: number) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+async function postPhoto<T>(body: object): Promise<T> {
+  const token = await accessToken();
+  const res = await fetch('/api/food-photo', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+  const d = await res.json().catch(() => ({})) as T & { error?: string };
+  if (!res.ok) throw Error(d.error ?? 'Analisi non riuscita.');
+  return d;
+}
 
 export function FoodDiary({ state, n, plan, add, remove }: { state: AppState; n: NutritionPlan; plan: Plan | null; add: Add; remove: (id: string) => void }) {
   const today = iso(new Date());
@@ -91,23 +108,26 @@ function Bar({ label, value, goal, unit, cls = '' }: { label: string; value: num
   </div>;
 }
 
-type Mode = 'search' | 'scan' | 'photo' | 'recent' | 'qty' | 'manual';
+type Mode = 'search' | 'scan' | 'photo' | 'recent' | 'qty' | 'manual' | 'label';
 type Picked = FoodItem & { grams?: number; source: FoodEntry['source']; id?: string };
 
 function Picker({ initial, date, recent, add }: { initial: { meal: MealSlot; mode: Mode; entry?: FoodEntry }; date: string; recent: FoodEntry[]; add: Add }) {
   const [mode, setMode] = useState<Mode>(initial.mode);
   const [meal, setMeal] = useState<MealSlot>(initial.meal);
   const [picked, setPicked] = useState<Picked | null>(initial.entry ? { ...initial.entry, source: initial.entry.source } : null);
+  const [label, setLabel] = useState<{ code?: string; name?: string }>({});
   const choose = (f: FoodItem, source: FoodEntry['source'], grams?: number) => { setPicked({ ...f, source, grams }); setMode('qty'); };
+  const readLabel = (x: { code?: string; name?: string } = {}) => { setLabel(x); setMode('label'); };
   const tabs: [Mode, string, typeof Search][] = [['search', 'Cerca', Search], ['scan', 'Codice', ScanBarcode], ['photo', 'Foto', Camera], ['recent', 'Recenti', History]];
   return <div className="picker">
-    {mode !== 'qty' && <div className="segmented full">{tabs.map(([m, l, Icon]) => <button key={m} type="button" aria-pressed={mode === m || (mode === 'manual' && m === 'search')} onClick={() => setMode(m)}><Icon size={16} /> {l}</button>)}</div>}
+    {mode !== 'qty' && <div className="segmented full">{tabs.map(([m, l, Icon]) => <button key={m} type="button" aria-pressed={mode === m || (mode === 'manual' && m === 'search') || (mode === 'label' && m === 'scan')} onClick={() => setMode(m)}><Icon size={16} /> {l}</button>)}</div>}
     {mode === 'search' && <SearchFood choose={choose} manual={() => setMode('manual')} />}
-    {mode === 'scan' && <Scan choose={choose} />}
+    {mode === 'scan' && <Scan choose={choose} known={recent} readLabel={readLabel} manual={() => setMode('manual')} />}
+    {mode === 'label' && <LabelPhoto {...label} choose={choose} />}
     {mode === 'photo' && <PhotoMeal date={date} meal={meal} setMeal={setMeal} add={add} />}
     {mode === 'recent' && <Recent list={recent} choose={choose} />}
-    {mode === 'manual' && <Manual choose={choose} />}
-    {mode === 'qty' && picked && <Quantity item={picked} meal={meal} setMeal={setMeal} back={initial.entry ? undefined : () => setMode('search')} save={grams => add({ id: picked.id, date: initial.entry?.date ?? date, meal, name: picked.name, brand: picked.brand, grams, kcal: picked.kcal, p: picked.p, c: picked.c, f: picked.f, code: picked.code, source: picked.source })} />}
+    {mode === 'manual' && <Manual choose={choose} readLabel={() => readLabel()} />}
+    {mode === 'qty' && picked && <Quantity item={picked} meal={meal} setMeal={setMeal} back={initial.entry ? undefined : () => setMode(picked.source === 'barcode' || picked.source === 'label' ? 'scan' : picked.source === 'recent' ? 'recent' : 'search')} save={grams => add({ id: picked.id, date: initial.entry?.date ?? date, meal, name: picked.name, brand: picked.brand, grams, kcal: picked.kcal, p: picked.p, c: picked.c, f: picked.f, code: picked.code, source: picked.source })} />}
   </div>;
 }
 
@@ -144,18 +164,23 @@ function SearchFood({ choose, manual }: { choose: (f: FoodItem, s: FoodEntry['so
   </>;
 }
 
-function Scan({ choose }: { choose: (f: FoodItem, s: FoodEntry['source']) => void }) {
+function Scan({ choose, known, readLabel, manual }: { choose: (f: FoodItem, s: FoodEntry['source']) => void; known: FoodEntry[]; readLabel: (x: { code?: string; name?: string }) => void; manual: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState('Avvio la fotocamera…');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState<{ code: string; name?: string } | null>(null);
   const lookup = async (c: string) => {
-    setBusy(true); setStatus(`Cerco il prodotto ${c}…`);
+    // A product this person already logged (also one read from its label) is found without asking the server.
+    const mine = [...known].reverse().find(e => e.code === c);
+    if (mine) { choose({ name: mine.name, brand: mine.brand, kcal: mine.kcal, p: mine.p, c: mine.c, f: mine.f, code: c }, 'barcode'); return; }
+    setBusy(true); setMissing(null); setStatus(`Cerco il prodotto ${c}…`);
     const res = await fetch(`/api/food?code=${c}`).catch(() => null);
-    const d = await res?.json().catch(() => null) as { item?: FoodItem; error?: string } | null;
+    const d = await res?.json().catch(() => null) as { item?: FoodItem; error?: string; name?: string } | null;
     setBusy(false);
-    if (d?.item) choose(d.item, 'barcode');
-    else setStatus(d?.error ?? 'Prodotto non trovato.');
+    if (d?.item) { choose(d.item, 'barcode'); return; }
+    if (res?.status === 404) { setMissing({ code: c, name: d?.name }); setStatus(d?.error ?? 'Prodotto non ancora nel database.'); }
+    else setStatus(d?.error ?? 'Ricerca non riuscita: riprova.');
   };
   useEffect(() => {
     let stream: MediaStream | null = null, stop = false, timer: ReturnType<typeof setTimeout>;
@@ -185,6 +210,11 @@ function Scan({ choose }: { choose: (f: FoodItem, s: FoodEntry['source']) => voi
   return <>
     <div className="scanner"><video ref={video} muted playsInline /><span className="scanframe" /></div>
     <p className="note center">{busy ? <span className="spinner" /> : null} {status}</p>
+    {missing && <div className="missing">
+      <p>Fotografa la tabella nutrizionale: leggo i valori e salvo il prodotto, così la prossima volta questo codice si trova subito, anche per gli altri utenti.</p>
+      <button type="button" className="primary" onClick={() => readLabel(missing)}><FileText size={17} /> Fotografa l’etichetta</button>
+      <button type="button" className="ghost" onClick={manual}><PenLine size={16} /> Inserisci i valori a mano</button>
+    </div>}
     <form className="codeinput" onSubmit={e => { e.preventDefault(); if (/^\d{8,14}$/.test(code)) lookup(code); }}>
       <input inputMode="numeric" placeholder="Oppure scrivi il codice (8–13 cifre)" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
       <button className="secondary" disabled={!/^\d{8,14}$/.test(code) || busy}>Cerca</button>
@@ -192,51 +222,97 @@ function Scan({ choose }: { choose: (f: FoodItem, s: FoodEntry['source']) => voi
   </>;
 }
 
-type Guess = { name: string; grams: number; kcal: number; p: number; c: number; f: number; on: boolean };
+type Guess = { name: string; grams: number; kcal: number; p: number; c: number; f: number; confidence: 'alta' | 'media' | 'bassa'; ref?: string; on: boolean };
 function PhotoMeal({ date, meal, setMeal, add }: { date: string; meal: MealSlot; setMeal: (m: MealSlot) => void; add: Add }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [items, setItems] = useState<Guess[] | null>(null);
+  const [image, setImage] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [result, setResult] = useState<{ dish: string; question: string; items: Guess[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function analyse(file: File) {
-    setError(''); setItems(null); setBusy(true);
+  async function analyse(img: string, extra: string, previous?: Guess[]) {
+    setError(''); setBusy(true);
     try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
-      const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
-      canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const image = canvas.toDataURL('image/jpeg', 0.8);
-      setPreview(image);
-      const token = await accessToken();
-      const res = await fetch('/api/food-photo', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ image }) });
-      const d = await res.json().catch(() => ({})) as { items?: Omit<Guess, 'on'>[]; error?: string };
-      if (!res.ok) throw Error(d.error ?? 'Analisi non riuscita.');
-      if (!d.items?.length) throw Error('Non vedo cibo nella foto: riprova inquadrando il piatto dall’alto.');
-      setItems(d.items.map(x => ({ ...x, on: true })));
+      const d = await postPhoto<{ dish: string; question: string; items: Omit<Guess, 'on'>[] }>({ image: img, note: extra, previous: previous?.filter(x => x.on).map(x => ({ name: x.name, grams: x.grams })) });
+      if (!d.items?.length) throw Error('Non vedo cibo nella foto: riprova inquadrando tutto il piatto, dall’alto o di tre quarti.');
+      setResult({ dish: d.dish, question: d.question, items: d.items.map(x => ({ ...x, on: true })) });
+      setNote('');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   }
+  async function pick(file: File) {
+    setResult(null); setError('');
+    let img: string;
+    try { img = await shrink(file, 1536, 0.85); } catch { setError('Non riesco ad aprire questa foto.'); return; }
+    setImage(img); await analyse(img, note);
+  }
+  const items = result?.items;
+  const set = (i: number, patch: Partial<Guess>) => setResult(r => r && { ...r, items: r.items.map((y, j) => j === i ? { ...y, ...patch } : y) });
   const chosen = items?.filter(x => x.on) ?? [];
   const tot = sum(chosen.map(x => ({ ...x, id: '', date, meal, source: 'photo' as const })));
+  const step = (g: number) => g >= 200 ? 20 : g >= 50 ? 10 : 5;
   return <>
     <label className="photodrop">
-      <input type="file" accept="image/*" capture="environment" hidden onChange={e => e.target.files?.[0] && analyse(e.target.files[0])} />
-      {preview ? <img src={preview} alt="Il tuo piatto" /> : <span><Camera size={28} /><b>Scatta o scegli la foto del piatto</b><small>Dall’alto, con tutto il piatto inquadrato</small></span>}
+      <input type="file" accept="image/*" capture="environment" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f); }} />
+      {image ? <img src={image} alt="Il tuo piatto" /> : <span><Camera size={28} /><b>Scatta o scegli la foto del piatto</b><small>Tutto il piatto inquadrato, con le posate accanto: aiutano a capire le dimensioni</small></span>}
     </label>
-    {busy && <p className="note center"><span className="spinner" /> Riconosco i cibi…</p>}
+    {!result && <label className="field"><span>Descrizione (facoltativa, migliora molto la stima)</span><textarea rows={2} maxLength={500} placeholder="Es. carbonara con 100 g di pasta cruda, 1 cucchiaio d’olio" value={note} onChange={e => setNote(e.target.value)} /></label>}
+    {busy && <p className="note center"><span className="spinner" /> {result ? 'Aggiorno la stima…' : 'Riconosco i cibi e stimo le porzioni…'}</p>}
     {error && <p className="formerror">{error}</p>}
-    {items && <>
-      <p className="pickerlabel">Controlla e correggi i grammi</p>
-      {items.map((x, i) => <div className={'guess' + (x.on ? '' : ' off')} key={i}>
-        <label className="setcheck"><input type="checkbox" checked={x.on} onChange={e => setItems(a => a!.map((y, j) => j === i ? { ...y, on: e.target.checked } : y))} /></label>
-        <span className="grow"><b>{x.name}</b><small className="num">{fmt(forGrams(x, x.grams).kcal)} kcal · P {forGrams(x, x.grams).p}</small></span>
-        <label className="gramsin"><input type="number" inputMode="numeric" min={1} max={2000} value={x.grams} onChange={e => setItems(a => a!.map((y, j) => j === i ? { ...y, grams: Number(e.target.value) || 0 } : y))} /><span>g</span></label>
-      </div>)}
+    {result && items && <>
+      <p className="dish">{result.dish && <b>{result.dish}</b>}<small>Controlla e correggi i grammi</small></p>
+      {items.map((x, i) => { const m = forGrams(x, x.grams); return <div className={'guess' + (x.on ? '' : ' off')} key={i}>
+        <label className="setcheck"><input type="checkbox" checked={x.on} onChange={e => set(i, { on: e.target.checked })} /></label>
+        <span className="grow"><b>{x.name}</b><small className="num">{fmt(m.kcal)} kcal · P {m.p} · C {m.c} · G {m.f}</small>
+          {(x.confidence !== 'alta' || x.ref) && <small className="tags">{x.confidence !== 'alta' && <i className={'conf ' + x.confidence}>{x.confidence === 'bassa' ? 'stima incerta' : 'stima media'}</i>}{x.ref && <i className="ref">valori da tabella</i>}</small>}</span>
+        <span className="gramsedit">
+          <button type="button" className="iconbtn small" aria-label={`Meno ${x.name}`} onClick={() => set(i, { grams: Math.max(0, x.grams - step(x.grams)) })}><Minus size={14} /></button>
+          <label className="gramsin"><input type="number" inputMode="numeric" min={1} max={3000} value={x.grams} onChange={e => set(i, { grams: Number(e.target.value) || 0 })} /><span>g</span></label>
+          <button type="button" className="iconbtn small" aria-label={`Più ${x.name}`} onClick={() => set(i, { grams: x.grams + step(x.grams) })}><Plus size={14} /></button>
+        </span>
+      </div>; })}
+      {image && <form className="refine" onSubmit={e => { e.preventDefault(); if (note.trim()) analyse(image, result.question ? `Domanda: ${result.question} Risposta: ${note}` : note, items); }}>
+        {result.question && <p className="question">{result.question}</p>}
+        <div className="codeinput"><input placeholder={result.question ? 'Rispondi…' : 'Correggi: «c’era anche il pane», «niente olio»…'} maxLength={500} value={note} onChange={e => setNote(e.target.value)} /><button className="secondary" disabled={!note.trim() || busy}><RefreshCw size={16} /> {result.question ? 'Invia' : 'Ricalcola'}</button></div>
+      </form>}
       <MealSelect meal={meal} setMeal={setMeal} />
-      <button className="primary big" disabled={!chosen.length} onClick={() => { for (const x of chosen) if (x.grams > 0) add({ date, meal, name: x.name, grams: x.grams, kcal: x.kcal, p: x.p, c: x.c, f: x.f, source: 'photo' }); }}><Check size={18} /> Aggiungi {chosen.length} {chosen.length === 1 ? 'alimento' : 'alimenti'} · {fmt(tot.kcal)} kcal</button>
-      <p className="note">Stima automatica: per i prodotti confezionati il codice a barre è più preciso.</p>
+      <button className="primary big" disabled={!chosen.length || busy} onClick={() => { for (const x of chosen) if (x.grams > 0) add({ date, meal, name: x.name, grams: x.grams, kcal: x.kcal, p: x.p, c: x.c, f: x.f, source: 'photo' }); }}><Check size={18} /> Aggiungi {chosen.length} {chosen.length === 1 ? 'alimento' : 'alimenti'} · {fmt(tot.kcal)} kcal</button>
+      <p className="note">Stima da foto: i grammi possono sbagliare del 20–30%. Per i confezionati il codice a barre è più preciso.</p>
     </>}
+  </>;
+}
+
+/** Nutrition label read from a photo; with a barcode the product is also saved for everyone. */
+function LabelPhoto({ code, name, choose }: { code?: string; name?: string; choose: (f: FoodItem, s: FoodEntry['source']) => void }) {
+  const [image, setImage] = useState<string | null>(null);
+  const [title, setTitle] = useState(name ?? '');
+  const [read, setRead] = useState<FoodItem | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const finish = (item: FoodItem, label: string) => {
+    const product = { ...item, name: label, code };
+    if (code) shareProduct({ ...product, code });
+    choose(product, 'label');
+  };
+  async function pick(file: File) {
+    setError(''); setBusy(true);
+    try {
+      const img = await shrink(file, 1800, 0.9); setImage(img);
+      const { item } = await postPhoto<{ item: FoodItem }>({ image: img, mode: 'label' });
+      const label = title.trim() || item.name;
+      if (label) finish(item, label); else setRead(item); // only the table was in the photo: ask for the name
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  }
+  return <>
+    <label className="field"><span>Nome del prodotto{read ? '' : ' (se non si legge nella foto)'}</span><input value={title} maxLength={120} placeholder="Es. Biscotti al cacao Mulino Bianco" autoFocus={!!read} onChange={e => setTitle(e.target.value)} /></label>
+    {read && <><p className="note">Valori letti: <b className="num">{fmt(read.kcal)}</b> kcal · P {read.p} · C {read.c} · G {read.f} per 100 g.</p>
+      <button type="button" className="primary big" disabled={!title.trim()} onClick={() => finish(read, title.trim())}><Check size={18} /> Avanti</button></>}
+    <label className="photodrop">
+      <input type="file" accept="image/*" capture="environment" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f); }} />
+      {image ? <img src={image} alt="Etichetta" /> : <span><FileText size={28} /><b>Fotografa la tabella nutrizionale</b><small>Da vicino, dritta, con buona luce e senza riflessi</small></span>}
+    </label>
+    {busy && <p className="note center"><span className="spinner" /> Leggo i valori…</p>}
+    {error && <p className="formerror">{error}</p>}
   </>;
 }
 
@@ -247,13 +323,14 @@ function Recent({ list, choose }: { list: FoodEntry[]; choose: (f: FoodItem, s: 
   return <>{items.map(e => <FoodOption key={e.id} f={e} onClick={() => choose(e, 'recent', e.grams)} />)}</>;
 }
 
-function Manual({ choose }: { choose: (f: FoodItem, s: FoodEntry['source']) => void }) {
+function Manual({ choose, readLabel }: { choose: (f: FoodItem, s: FoodEntry['source']) => void; readLabel: () => void }) {
   return <form onSubmit={e => {
     e.preventDefault();
     const d = new FormData(e.currentTarget), v = (k: string) => Number(String(d.get(k) ?? '').replace(',', '.')) || 0;
     choose({ name: String(d.get('name')), kcal: v('kcal'), p: v('p'), c: v('c'), f: v('f') }, 'manual');
   }}>
-    <p className="note">Copia i valori «per 100 g» dall’etichetta.</p>
+    <button type="button" className="secondary full" onClick={readLabel}><FileText size={17} /> Leggi l’etichetta con la fotocamera</button>
+    <p className="note">Oppure copia i valori «per 100 g» dall’etichetta.</p>
     <div className="formgrid">
       <label className="field" style={{ gridColumn: '1 / -1' }}><span>Nome</span><input name="name" required maxLength={120} /></label>
       <label className="field"><span>Energia (kcal)</span><input name="kcal" type="number" inputMode="decimal" step="any" min={0} max={950} required /></label>
