@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Mark } from '../components/mark';
 
-export const CONTACT = 'marchesinigabriele2006@gmail.com';
+export const CONTACT = 'gabrymark06@gmail.com';
 export const UPDATED = '1 ottobre 2026';
 
 /** Shared shell for the privacy and terms pages: readable column, brand, back link. */
