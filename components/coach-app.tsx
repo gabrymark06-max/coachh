@@ -1,11 +1,14 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, X, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles, ChartLine, SendHorizontal, Eraser } from 'lucide-react';
+import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, X, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles, ChartLine, SendHorizontal, Eraser, LogOut } from 'lucide-react';
 import { type AppState, type Session, type Decision, type Plan, type Profile, type Measurement, emptyState, dayNames, goalNames } from '../lib/types';
 import { nutrition, muscleNames, activityFrom, coreGoal, type NutritionPlan } from '../lib/planner';
-import { load, save, apply, type Action } from '../lib/store';
+import { load, save, apply, clearLocal, type Action } from '../lib/store';
 import Workout from './workout';
 import { Questionnaire, defaults } from './questionnaire';
+import { Mark } from './mark';
+import { Login } from './login';
+import { supabase, loadRemote, pushRemote, deleteRemote, accessToken } from '../lib/supabase';
 import { Progress, MeasureForm } from './progress';
 import { buildContext, evidenceFor } from '../lib/context';
 import { answer } from '../lib/coach';
@@ -38,9 +41,52 @@ export default function CoachApp() {
   const [pending, setPending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Login: 'off' when Supabase is not configured (data stays on the device), otherwise the session decides.
+  const [auth, setAuth] = useState<'checking' | 'out' | 'in' | 'off'>(supabase ? 'checking' : 'off');
+  const [email, setEmail] = useState('');
+  const [recovery, setRecovery] = useState(false);
+  const uid = useRef<string | null>(null);
 
-  const setS = (next: AppState) => { setRaw(next); try { save(next); } catch (e) { setError((e as Error).message); } };
-  const update = (fn: (prev: AppState) => AppState) => setRaw(prev => { const next = fn(prev); try { save(next); } catch { /* reported on the next action */ } return next; });
+  const persist = (next: AppState) => { save(next); if (uid.current) pushRemote(uid.current, next); };
+  const setS = (next: AppState) => { setRaw(next); try { persist(next); } catch (e) { setError((e as Error).message); } };
+  const update = (fn: (prev: AppState) => AppState) => setRaw(prev => { const next = fn(prev); try { persist(next); } catch { /* reported on the next action */ } return next; });
+
+  useEffect(() => {
+    if (!supabase) return;
+    let live = true;
+    // On sign-in the account's cloud copy wins; a first login uploads what this device already has (unless it belonged to someone else).
+    const signedIn = async (id: string, mail: string) => {
+      if (uid.current === id) return;
+      uid.current = id;
+      setEmail(mail);
+      try {
+        const remote = await loadRemote(id);
+        const owner = localStorage.getItem('tempra-owner');
+        const local = owner && owner !== id ? emptyState() : load();
+        const next = remote ? { ...emptyState(), ...remote } : local;
+        if (!live) return;
+        setRaw(next); save(next);
+        if (!remote && next.profile) pushRemote(id, next);
+        localStorage.setItem('tempra-owner', id);
+      } catch (e) { setError((e as Error).message); }
+      if (live) setAuth('in');
+    };
+    supabase.auth.getSession().then(({ data }) => { if (!live) return; if (data.session) signedIn(data.session.user.id, data.session.user.email ?? ''); else setAuth('out'); });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
+      if (session) signedIn(session.user.id, session.user.email ?? '');
+      else if (event === 'SIGNED_OUT') { uid.current = null; setAuth('out'); }
+    });
+    return () => { live = false; sub.subscription.unsubscribe(); };
+  }, []);
+
+  async function logout() {
+    if (!confirm('Uscire dall’account? I tuoi dati restano salvati nel cloud.')) return;
+    await supabase?.auth.signOut();
+    uid.current = null;
+    clearLocal(); await clearPhotos();
+    setRaw(emptyState()); setEdit(false); setWelcome(true); setTab('home'); setAuth('out');
+  }
   useEffect(() => { if (tab === 'chat') endRef.current?.scrollIntoView({ block: 'end' }); }, [tab, s.messages.length, pending]);
 
   /** Ask the coach: Gemini on the server with the person's data and the relevant evidence; local rules if the AI is not configured. */
@@ -53,7 +99,8 @@ export default function CoachApp() {
     setS(base); setChat(''); setPending(true);
     let reply: { text: string; mode: string } | null = null;
     try {
-      const res = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: base.messages.slice(-16).map(m => ({ role: m.role, text: m.text })), context: buildContext(base), evidence: evidenceFor(text) }) });
+      const token = await accessToken();
+      const res = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ messages: base.messages.slice(-16).map(m => ({ role: m.role, text: m.text })), context: buildContext(base), evidence: evidenceFor(text) }) });
       const data = await res.json().catch(() => ({})) as { text?: string; error?: string };
       if (res.ok && data.text) reply = { text: data.text, mode: 'ai' };
       else if (res.status === 503 || res.status === 404) reply = { text: answer(text, base).text, mode: 'local' };
@@ -87,10 +134,13 @@ export default function CoachApp() {
   const modal = (title: string, body: ReactNode, close: () => void) => <Modal title={title} close={close}>{error && <div className="error" role="alert">{error}</div>}{body}</Modal>;
   const save1 = (v: Profile) => { if (act({ type: 'profile', data: v })) { setEdit(false); setReveal(true); setTab('home'); } };
 
+  if (auth === 'checking') return <div className="boot"><span className="bootmark" /></div>;
+  if (auth === 'out' || recovery) return <Login recovery={recovery} done={() => setRecovery(false)} />;
+
   // First run: welcome, then questionnaire.
   if (!p) return <div className="onboarding">
     <header className="obhead"><Brand /></header>
-    {welcome ? <Welcome begin={() => setWelcome(false)} /> : <Questionnaire initial={defaults} busy={false} onSave={save1} onCancel={() => setWelcome(true)} />}
+    {welcome ? <Welcome cloud={auth === 'in'} begin={() => setWelcome(false)} /> : <Questionnaire initial={defaults} busy={false} onSave={save1} onCancel={() => setWelcome(true)} />}
     {error && <div className="error floating" role="alert">{error}</div>}
   </div>;
 
@@ -193,8 +243,9 @@ export default function CoachApp() {
         <button className="secondary" onClick={() => { const u = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = u; a.download = 'tempra-dati.json'; a.click(); URL.revokeObjectURL(u); }}><Download size={16} /> Esporta i dati</button>
         <button className="secondary" onClick={() => fileRef.current?.click()}><Upload size={16} /> Importa</button>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={e => e.target.files?.[0] && importData(e.target.files[0])} />
-        <button className="danger" onClick={() => { if (confirm('Eliminare profilo, piano e diario da questo dispositivo?')) { act({ type: 'reset' }); clearPhotos(); setEdit(false); setWelcome(true); } }}><Trash2 size={16} /> Elimina tutto</button>
-      </div></>, () => setEdit(false))}
+        <button className="danger" onClick={() => { if (confirm(auth === 'in' ? 'Eliminare profilo, piano, diario, misure e foto dal tuo account? Non si può annullare.' : 'Eliminare profilo, piano e diario da questo dispositivo?')) { const id = uid.current; act({ type: 'reset' }); clearPhotos(); if (id) deleteRemote(id); setEdit(false); setWelcome(true); } }}><Trash2 size={16} /> Elimina tutto</button>
+      </div>
+      {auth === 'in' && <div className="account"><span>Account: <b>{email}</b></span><button className="secondary" onClick={logout}><LogOut size={16} /> Esci</button></div>}</>, () => setEdit(false))}
     {measure && modal(measure === 'new' ? 'Nuova misurazione' : 'Modifica misurazione', <MeasureForm initial={measure === 'new' ? null : measure} save={m => { if (act({ type: 'measure', data: m })) setMeasure(null); else throw Error('Controlla i valori inseriti.'); }} />, () => setMeasure(null))}
     {session && modal(session.title, <Workout key={session.exercises.map(x => x.id).join(',')} profile={p} state={s} deload={!!bp?.meso.deload} changeVariant={data => act({ type: 'variant', data: data as { sessionId: string; exerciseId: string; name: string } })} session={session} save={x => { if (act({ type: 'log', data: x as never })) setSession(null); }} />, () => setSession(null))}
     {check && modal('Come stai oggi?', <CheckIn save={v => { if (act({ type: 'checkin', data: v as never })) setCheck(false); }} />, () => setCheck(false))}
@@ -202,9 +253,6 @@ export default function CoachApp() {
   </div>;
 }
 
-export function Mark({ size = 38 }: { size?: number }) {
-  return <svg className="mark" width={size} height={size} viewBox="0 0 64 64" aria-hidden><defs><linearGradient id="tm" x1="0" x2="1"><stop offset="0" stopColor="#D9A93A" /><stop offset=".38" stopColor="#A4602F" /><stop offset=".68" stopColor="#6B4E9B" /><stop offset="1" stopColor="#2F5DA8" /></linearGradient></defs><rect width="64" height="64" rx="15" fill="#1D2329" /><rect x="12" y="15" width="40" height="9" rx="2.5" fill="url(#tm)" /><path d="M27.5 24h9v21.5c0 2.2 1.1 3.3 3.3 3.3h3.7V53h-6.2c-6.3 0-9.8-3.3-9.8-9.4z" fill="#EEF1F3" /></svg>;
-}
 function Brand() { return <div className="brand"><Mark /><span><strong>tempra</strong><small>il tuo coach</small></span></div>; }
 
 function SessionCard({ s, done, open }: { s: Session; done: boolean; open: () => void }) {
@@ -340,7 +388,7 @@ function CheckIn({ save }: { save: (v: unknown) => unknown }) {
   </form>;
 }
 
-function Welcome({ begin }: { begin: () => void }) {
+function Welcome({ begin, cloud }: { begin: () => void; cloud: boolean }) {
   return <section className="welcome">
     <h1>Il coach che ti dice <em>cosa fare</em>, in palestra e a tavola.</h1>
     <p className="lead">Rispondi a qualche domanda: costruisco allenamento, cardio e dieta per dimagrire, ricomporti o mettere massa, e li adatto ogni settimana a come va davvero.</p>
@@ -350,7 +398,7 @@ function Welcome({ begin }: { begin: () => void }) {
       <div className="wcard run"><Footprints /><h2>Cardio e passi</h2><p>Solo quelli che servono al tuo obiettivo, quando non rubano recupero ai muscoli.</p></div>
       <div className="wcard food"><Utensils /><h2>Dieta</h2><p>La fase giusta, le calorie e una giornata tipo con alimenti e grammi.</p></div>
     </div>
-    <small className="fine">Basato sugli studi scientifici più solidi su allenamento e nutrizione. Nessun account: i dati restano sul tuo telefono. Per adulti.</small>
+    <small className="fine">Basato sugli studi scientifici più solidi su allenamento e nutrizione. {cloud ? 'I tuoi dati restano nel tuo account, su ogni dispositivo.' : 'Nessun account: i dati restano sul tuo telefono.'} Per adulti.</small>
   </section>;
 }
 

@@ -16,6 +16,11 @@ export function load(): AppState {
   } catch { return emptyState(); }
 }
 
+/** Forget this device's copy (logout). */
+export function clearLocal() {
+  try { localStorage.removeItem(KEY); localStorage.removeItem('tempra-owner'); } catch { /* storage unavailable */ }
+}
+
 export function save(s: AppState) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { throw Error('Spazio di memoria del browser esaurito: esporta i dati ed elimina il diario più vecchio.'); }
 }

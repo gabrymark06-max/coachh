@@ -38,14 +38,24 @@ Variabili facoltative:
 
 Senza chiave la chat risponde con le regole locali e lo segnala sotto ogni risposta.
 
-## Dati
+## Account e dati (Supabase)
 
-Non c'è un account.
+Con Supabase configurato, all'avvio compare la pagina di accesso: Google, Apple oppure email e password.
 
-- Profilo, piano, diario e misure restano nel browser (`localStorage`).
-- Le foto restano nel browser (IndexedDB), compresse.
-- Dal profilo puoi esportare i dati (foto escluse), importarli o eliminarli.
-- Alla chat vengono inviati solo il riepilogo dei dati e la conversazione, mai le foto.
+- Piano, diario e misure vengono salvati nella tabella `app_state`, una riga per utente.
+- Le foto vanno nel bucket privato `photos`.
+- Le regole di sicurezza permettono a ogni utente di vedere solo i propri dati.
+- Il telefono tiene una copia locale per essere veloce.
+- Con il login attivo, la chat accetta solo utenti autenticati.
+
+Configurazione:
+
+1. Esegui `supabase/schema.sql` nell'editor SQL di Supabase.
+2. Su Vercel aggiungi `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (la chiave pubblica, *publishable* o *anon*).
+3. In Supabase, *Authentication → URL Configuration*, imposta l'URL del sito come *Site URL* e come *Redirect URL*.
+4. Attiva i provider in *Authentication → Providers*: Email è attivo di default; Google richiede un client OAuth di Google Cloud; Apple richiede l'Apple Developer Program.
+
+Senza queste variabili l'app funziona senza account e i dati restano nel browser (`localStorage` e IndexedDB).
 
 ## Sviluppo
 

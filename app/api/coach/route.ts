@@ -33,6 +33,13 @@ function limited(ip: string) {
 export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: 'not-configured' }, { status: 503 });
+  // With login configured, only signed-in users can spend the Gemini quota.
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (sbUrl && sbKey) {
+    const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    const user = token ? await fetch(`${sbUrl}/auth/v1/user`, { headers: { apikey: sbKey, Authorization: `Bearer ${token}` } }).catch(() => null) : null;
+    if (!user?.ok) return Response.json({ error: 'Accedi di nuovo per parlare con il coach.' }, { status: 401 });
+  }
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
   if (limited(ip)) return Response.json({ error: 'Troppe domande in poco tempo: riprova tra qualche minuto.' }, { status: 429 });
   let body: { messages?: Turn[]; context?: string; evidence?: Card[] };
