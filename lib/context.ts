@@ -3,6 +3,8 @@ import type { AppState } from './types';
 import { dayNames, goalNames, painNames, cardioNames } from './types';
 import { nutrition, activityFrom, coreGoal, suggest, history, describe } from './planner';
 import { retrieve } from './coach';
+import { forGrams } from './foods';
+import { mealNames } from './types';
 
 const d = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
 const kg = (x: number | null | undefined) => (x ? `${x.toLocaleString('it-IT')} kg` : '—');
@@ -43,6 +45,16 @@ export function buildContext(s: AppState): string {
   if (ms.length) {
     const row = (m: typeof ms[number]) => `${d(m.date)}: ${[m.weight && `peso ${m.weight}`, m.waist && `vita ${m.waist}`, m.chest && `petto ${m.chest}`, m.arm && `braccio ${m.arm}`, m.thigh && `coscia ${m.thigh}`, m.hips && `fianchi ${m.hips}`].filter(Boolean).join(', ')}${Object.keys(m.photos).length ? ' (con foto)' : ''}`;
     out.push(`MISURE (kg e cm): ${[...(ms.length > 6 ? [ms[0]] : []), ...ms.slice(-6)].map(row).join(' | ')}`);
+  }
+  const foods = s.foods ?? [];
+  if (foods.length) {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+    const tot = (list: typeof foods) => list.reduce((t, e) => { const m = forGrams(e, e.grams); return { k: t.k + m.kcal, p: t.p + m.p, c: t.c + m.c, f: t.f + m.f }; }, { k: 0, p: 0, c: 0, f: 0 });
+    const days = [...new Set(foods.map(e => e.date))].sort().slice(-7);
+    const r = (x: number) => Math.round(x);
+    const t = tot(foods.filter(e => e.date === today));
+    out.push(`ALIMENTAZIONE REGISTRATA OGGI: ${r(t.k)} kcal, P ${r(t.p)} g, C ${r(t.c)} g, G ${r(t.f)} g · ${foods.filter(e => e.date === today).map(e => `${mealNames[e.meal]}: ${e.name} ${r(e.grams)} g`).join('; ') || 'niente ancora'}`);
+    out.push(`ULTIMI GIORNI REGISTRATI: ${days.map(d => { const x = tot(foods.filter(e => e.date === d)); return `${d.slice(5)} ${r(x.k)} kcal/P ${r(x.p)}`; }).join(' | ')}`);
   }
   const ck = s.checkins.slice(-5);
   if (ck.length) out.push(`CHECK-IN: ${ck.map(c => `${d(c.date)} sonno ${c.sleep} h, fatica ${c.fatigue}/5, indolenzimento ${c.soreness}/5${c.weight ? `, peso ${c.weight}` : ''}${c.pain ? ', dolore' : ''}${c.note ? ` «${c.note}»` : ''}`).join(' | ')}`);

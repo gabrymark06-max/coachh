@@ -267,6 +267,12 @@ function nutritionReview(state: AppState): Decision | null {
   else if (phase === 'gain' && change > 0.6) advice = 'Il peso sale più dello 0,5% a settimana: togli 100–150 kcal per limitare il grasso.';
   else if (phase === 'maintain' && Math.abs(change) > 0.7) advice = change > 0 ? 'Il peso sale nonostante l’obiettivo di mantenimento: togli 100–150 kcal.' : 'Il peso scende nonostante l’obiettivo di mantenimento: aggiungi 100–150 kcal.';
   else advice = 'L’andamento è in linea con l’obiettivo: mantieni.';
+  // Logged intake makes the advice concrete: compare what was eaten with the target before changing it.
+  const daysLogged = [...new Set((state.foods ?? []).filter(f => t - Date.parse(f.date + 'T12:00:00') < 7 * day).map(f => f.date))];
+  if (daysLogged.length >= 4) {
+    const kcal = daysLogged.reduce((sum, d) => sum + (state.foods ?? []).filter(f => f.date === d).reduce((a, f) => a + f.kcal * f.grams / 100, 0), 0) / daysLogged.length;
+    advice += ` Nel diario alimentare hai registrato in media ${Math.round(kcal)} kcal al giorno su ${daysLogged.length} giorni.`;
+  }
   return { id: id(), date: now(), title: `Peso: ${change >= 0 ? '+' : ''}${change.toFixed(1)}% nella media settimanale`, reason: advice + ' Il singolo giorno oscilla per acqua e cibo: decide la media.', sources: cite('weighing', 'energyEstimate'), rule: 'weight-trend' };
 }
 

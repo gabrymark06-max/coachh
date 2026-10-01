@@ -20,6 +20,12 @@ Tempra ti fa un questionario e costruisce un piano completo per **dimagrire, far
   - forza stimata per esercizio;
   - foto (fronte, lato, dietro) con confronto prima/dopo, affiancato o a scorrimento.
 - **Dieta:** fase, calorie, macronutrienti, giornata tipo e correzioni dalla media del peso.
+- **Diario alimentare:**
+  - codice a barre con la fotocamera (Open Food Facts);
+  - ricerca tra oltre 100 alimenti comuni e i prodotti di marca;
+  - foto del piatto riconosciuta da Gemini, con i grammi da confermare;
+  - quantità in grammi e totali del giorno confrontati con gli obiettivi.
+  - Il coach in chat e la revisione settimanale usano quello che registri.
 - **Coach in chat con Gemini (Google AI):** risponde usando il tuo piano, i carichi, il diario, le misure e gli studi più pertinenti.
 
 Le regole del motore si basano su 257 studi scientifici verificati su PubMed (raccolta `coach-brain`). Le fonti sono usate internamente e non compaiono nell'interfaccia.

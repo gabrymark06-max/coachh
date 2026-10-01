@@ -1,5 +1,7 @@
 // Coach chat backed by the Gemini API. The browser sends the conversation, a compact summary of the person's
 // plan, diary and measurements, and the most relevant evidence cards; the key stays on the server.
+import { signedIn, limited } from '../../../lib/server-auth';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +10,6 @@ type Card = { title: string; year: number; finding: string; coach_use: string };
 
 // Tried in order: an overloaded or missing model hands over to the next one.
 const MODELS = [...new Set([process.env.GEMINI_MODEL || 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'])];
-const hits = new Map<string, number[]>();
 
 const SYSTEM = `Sei Tempra, il coach personale dell'utente: un preparatore esperto di palestra, ricomposizione corporea, aumento della massa muscolare e dimagrimento. La palestra è la base; cardio e passi li decidi tu in base all'obiettivo.
 
@@ -24,24 +25,11 @@ Sicurezza:
 - Dolore al petto, svenimenti, affanno anomalo: interrompere e chiedere assistenza medica. Dolore articolare: fermare il movimento che lo provoca e farlo valutare; non fare diagnosi.
 - Niente dosaggi di farmaci, steroidi anabolizzanti o sostanze dopanti; niente diete sotto 1200 kcal o digiuni estremi. Con segnali di disturbi alimentari rispondi con delicatezza e suggerisci un professionista.`;
 
-function limited(ip: string) {
-  const t = Date.now(), list = (hits.get(ip) ?? []).filter(x => t - x < 10 * 60_000);
-  list.push(t); hits.set(ip, list);
-  return list.length > 40;
-}
-
 export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: 'not-configured' }, { status: 503 });
-  // With login configured, only signed-in users can spend the Gemini quota.
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (sbUrl && sbKey) {
-    const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-    const user = token ? await fetch(`${sbUrl}/auth/v1/user`, { headers: { apikey: sbKey, Authorization: `Bearer ${token}` } }).catch(() => null) : null;
-    if (!user?.ok) return Response.json({ error: 'Accedi di nuovo per parlare con il coach.' }, { status: 401 });
-  }
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
-  if (limited(ip)) return Response.json({ error: 'Troppe domande in poco tempo: riprova tra qualche minuto.' }, { status: 429 });
+  if (!(await signedIn(req))) return Response.json({ error: 'Accedi di nuovo per parlare con il coach.' }, { status: 401 });
+  if (limited(req, 'coach', 40)) return Response.json({ error: 'Troppe domande in poco tempo: riprova tra qualche minuto.' }, { status: 429 });
   let body: { messages?: Turn[]; context?: string; evidence?: Card[] };
   try { body = await req.json(); } catch { return Response.json({ error: 'Richiesta non valida.' }, { status: 400 }); }
   const messages = (body.messages ?? []).filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string').slice(-16).map(m => ({ ...m, text: m.text.slice(0, 4000) }));

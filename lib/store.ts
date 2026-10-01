@@ -1,5 +1,5 @@
 // Client-side state: every action runs the coaching engine in the browser and the result is saved on this device.
-import { emptyState, type AppState, type CheckIn, type Measurement, type Profile, type WorkoutLog } from './types';
+import { emptyState, type AppState, type CheckIn, type FoodEntry, type Measurement, type Profile, type WorkoutLog } from './types';
 import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal } from './planner';
 import { answer } from './coach';
 
@@ -51,6 +51,8 @@ export type Action =
   | { type: 'measure'; data: Omit<Measurement, 'id'> & { id?: string } }
   | { type: 'measureDelete'; data: string }
   | { type: 'clearChat' }
+  | { type: 'food'; data: Omit<FoodEntry, 'id'> & { id?: string } }
+  | { type: 'foodDelete'; data: string }
   | { type: 'reset' };
 
 /** Apply one action to a copy of the state. Throws an Error with a user-facing message when the action is not allowed. */
@@ -134,6 +136,20 @@ export function apply(prev: AppState, action: Action): AppState {
       if (s.profile && m.id === s.measurements.at(-1)?.id) s.profile = { ...s.profile, ...(m.waist ? { waist: m.waist } : {}), ...(m.weight ? { weight: m.weight } : {}) };
       break;
     }
+    case 'food': {
+      const d = action.data;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw Error('Data non valida.');
+      if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(d.meal)) throw Error('Pasto non valido.');
+      const name = clean(d.name, 120);
+      if (!name) throw Error('Scrivi il nome dell’alimento.');
+      const e: FoodEntry = {
+        id: d.id ?? id(), date: d.date, meal: d.meal, name, brand: d.brand ? clean(d.brand, 80) : undefined, grams: num(d.grams, 1, 3000),
+        kcal: num(d.kcal, 0, 950), p: num(d.p, 0, 100), c: num(d.c, 0, 100), f: num(d.f, 0, 100), code: d.code, source: d.source,
+      };
+      s.foods = [...(s.foods ?? []).filter(x => x.id !== e.id), e].slice(-4000);
+      break;
+    }
+    case 'foodDelete': s.foods = (s.foods ?? []).filter(x => x.id !== action.data); break;
     case 'measureDelete': s.measurements = (s.measurements ?? []).filter(x => x.id !== action.data); break;
     case 'reset': return { ...emptyState(), revision: prev.revision + 1 };
   }

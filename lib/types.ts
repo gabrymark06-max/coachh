@@ -72,7 +72,13 @@ export type Measurement = {
   id: string; date: string; weight: number | null; waist: number | null; chest: number | null; arm: number | null; thigh: number | null; hips: number | null;
   note: string; photos: Partial<Record<Pose, string>>;
 };
-export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; revision: number };
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+/** One food eaten: nutrition per 100 g plus the grams eaten. */
+export type FoodEntry = {
+  id: string; date: string; meal: MealSlot; name: string; brand?: string; grams: number;
+  kcal: number; p: number; c: number; f: number; code?: string; source: 'barcode' | 'search' | 'generic' | 'photo' | 'manual' | 'recent';
+};
+export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number };
 export type Paper = { id: string; title: string; authors: string; year: number; doi: string; pmid: string; url: string; topics: string[]; study_type: string; population: string; finding: string; limitations: string; coach_use: string; access_level: string; oa_full_text_url: string; collections: string[] };
 export const dayNames = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 export const goalNames: Record<Goal, string> = { 'fat-loss': 'Dimagrire', recomp: 'Ricomposizione corporea', muscle: 'Mettere massa', strength: 'Diventare più forte', health: 'Stare in forma', balanced: 'Ricomposizione corporea', running: 'Stare in forma' };
@@ -89,5 +95,6 @@ export const screeningNames: Record<ScreeningFlag, string> = {
   meds: 'Assumo farmaci per una condizione cronica',
   pregnancy: 'Sono in gravidanza o nel post-parto',
 };
-export const emptyState = (): AppState => ({ profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], measurements: [], revision: 0 });
+export const emptyState = (): AppState => ({ profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], measurements: [], foods: [], revision: 0 });
+export const mealNames: Record<MealSlot, string> = { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Spuntini' };
 export const poseNames: Record<Pose, string> = { front: 'Fronte', side: 'Lato', back: 'Dietro' };

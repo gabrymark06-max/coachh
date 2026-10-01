@@ -1,12 +1,14 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, X, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles, ChartLine, SendHorizontal, Eraser, LogOut } from 'lucide-react';
+import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles, ChartLine, SendHorizontal, Eraser, LogOut } from 'lucide-react';
 import { type AppState, type Session, type Decision, type Plan, type Profile, type Measurement, emptyState, dayNames, goalNames } from '../lib/types';
 import { nutrition, muscleNames, activityFrom, coreGoal, type NutritionPlan } from '../lib/planner';
 import { load, save, apply, clearLocal, type Action } from '../lib/store';
 import Workout from './workout';
 import { Questionnaire, defaults } from './questionnaire';
 import { Mark } from './mark';
+import { Modal } from './modal';
+import { FoodDiary } from './food-log';
 import { Login } from './login';
 import { supabase, loadRemote, pushRemote, deleteRemote, accessToken } from '../lib/supabase';
 import { Progress, MeasureForm } from './progress';
@@ -210,7 +212,7 @@ export default function CoachApp() {
 
         {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} onEdit={() => setEdit(true)} onNext={() => { if (confirm('Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
 
-        {!reveal && tab === 'food' && p && n && <Diet n={n} p={p} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} />}
+        {!reveal && tab === 'food' && p && n && <Diet n={n} p={p} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} add={e => act({ type: 'food', data: e })} remove={id => act({ type: 'foodDelete', data: id })} />} />}
 
         {!reveal && tab === 'progress' && <Progress state={s} add={() => setMeasure('new')} edit={m => setMeasure(m)} remove={m => { if (confirm(`Eliminare la misurazione del ${new Date(m.date + 'T12:00:00').toLocaleDateString('it-IT')}${Object.keys(m.photos).length ? ' e le sue foto' : ''}?`)) { act({ type: 'measureDelete', data: m.id }); deletePhotos(Object.values(m.photos)); } }} />}
 
@@ -320,7 +322,7 @@ function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s: Sessi
   </>;
 }
 
-function Diet({ n, p, dayKind, setDayKind, edit }: { n: NutritionPlan; p: Profile; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void }) {
+function Diet({ n, p, dayKind, setDayKind, edit, diary }: { n: NutritionPlan; p: Profile; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void; diary: ReactNode }) {
   if (n.blocked) return <><Heading label="Dieta" title="Alimentazione." description="" /><section className="panel notice"><h2>Piano alimentare non attivo</h2><p>{n.reason}</p><button className="primary" onClick={edit}>Modifica risposte</button></section></>;
   const m = dayKind === 'training' ? n.training : n.rest;
   const meals = n.meals ? (dayKind === 'training' ? n.meals.training : n.meals.rest) : [];
@@ -331,6 +333,8 @@ function Diet({ n, p, dayKind, setDayKind, edit }: { n: NutritionPlan; p: Profil
     <Heading label="Dieta" title={`Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.phaseReason}>
       <button className="secondary" onClick={edit}>Modifica risposte</button>
     </Heading>
+    {diary}
+    <div className="sectionheading" style={{ marginTop: 32 }}><h2>Il tuo piano alimentare</h2></div>
     <div className="dietgrid">
       <section className="panel phasecard">
         <div className="eyebrow">Obiettivo settimanale</div>
@@ -423,8 +427,3 @@ function Heading({ label, title, description, children }: { label: string; title
   return <div className="pageheading"><div><div className="eyebrow">{label}</div><h1>{title}</h1>{description && <p>{description}</p>}</div>{children}</div>;
 }
 function Metric({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
-function Modal({ title, children, close }: { title: string; children: ReactNode; close: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const d = ref.current; d?.showModal(); return () => d?.close(); }, []);
-  return <dialog ref={ref} className="modal" onCancel={close}><div className="dialoghead"><h2>{title}</h2><button className="iconbtn" autoFocus onClick={close} aria-label="Chiudi"><X /></button></div><div className="body">{children}</div></dialog>;
-}

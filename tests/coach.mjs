@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 const out = path.resolve('.test-build');
 await build({ entryPoints: { engine: 'tests/entry.ts' }, bundle: true, format: 'esm', platform: 'node', outdir: out, outExtension: { '.js': '.mjs' }, logLevel: 'error' });
 const E = await import(pathToFileURL(path.join(out, 'engine.mjs')).href + '?' + Date.now());
-const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split, howTo, suggest, rampSets, warmupFor, buildContext, families } = E;
+const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split, howTo, suggest, rampSets, warmupFor, buildContext, families, searchGeneric, forGrams, genericFoods } = E;
 const evidence = new Set(JSON.parse(fs.readFileSync('lib/evidence.json', 'utf8')).map(p => p.id));
 
 const base = { name: 'Test', age: 28, sex: 'male', weight: 80, height: 178, waist: 88, goal: 'recomp', strengthLevel: 'intermediate', runningLevel: 'new', days: [0, 2, 4], minutes: 60, equipment: 'gym', recentRunMinutes: 0, recentLongest: 0, activity: 'low', diet: 'omnivore', restrictions: '', clinical: false, pain: false, nutritionConsent: true, steps: 5500, cardio: [], mealsPerDay: 4, trainingTime: 'evening', allergens: [] };
@@ -237,9 +237,25 @@ const ctx = buildContext(s);
 assert(/PROFILO/.test(ctx) && /PIANO/.test(ctx) && /DIARIO/.test(ctx) && /MISURE/.test(ctx) && /vita 86/.test(ctx), 'Chat context: ' + ctx.slice(0, 300));
 assert(/prossimo carico|ultima volta/.test(ctx), 'Context carries load suggestions');
 s = apply(s, { type: 'measureDelete', data: s.measurements[0].id }); assert.equal(s.measurements.length, 0);
+// Food diary.
+assert(searchGeneric('pollo').some(f => /pollo/i.test(f.name)), 'Generic search');
+assert(searchGeneric('yog gre')[0].name.startsWith('Yogurt greco'), 'Prefix search across words');
+assert(searchGeneric('caffe').length >= 1, 'Accent-insensitive search');
+for (const f of genericFoods.filter(x => !/Birra|Vino|chia/.test(x.name))) { const k = f.p * 4 + f.c * 4 + f.f * 9; assert(Math.abs(k - f.kcal) <= Math.max(25, f.kcal * 0.2), `Macros match kcal for ${f.name}: ${k} vs ${f.kcal}`); }
+assert.deepEqual(forGrams({ kcal: 355, p: 12, c: 72, f: 1.5 }, 80), { kcal: 284, p: 9.6, c: 57.6, f: 1.2 });
+const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+s = apply(s, { type: 'food', data: { date: today, meal: 'lunch', name: 'Pasta di semola (cruda)', grams: 80, kcal: 355, p: 12, c: 72, f: 1.5, source: 'generic' } });
+s = apply(s, { type: 'food', data: { date: today, meal: 'lunch', name: 'Petto di pollo (crudo)', grams: 150, kcal: 110, p: 23, c: 0, f: 1.5, source: 'barcode', code: '123' } });
+assert.equal(s.foods.length, 2);
+const edited = { ...s.foods[0], grams: 100 };
+s = apply(s, { type: 'food', data: edited }); assert.equal(s.foods.length, 2, 'Edit keeps one entry'); assert.equal(s.foods.find(f => f.id === edited.id).grams, 100);
+assert.throws(() => apply(s, { type: 'food', data: { date: today, meal: 'lunch', name: 'X', grams: 0, kcal: 100, p: 1, c: 1, f: 1, source: 'manual' } }), /intervallo/);
+assert.throws(() => apply(s, { type: 'food', data: { date: today, meal: 'brunch', name: 'X', grams: 10, kcal: 100, p: 1, c: 1, f: 1, source: 'manual' } }), /Pasto/);
+assert(/ALIMENTAZIONE REGISTRATA OGGI: 520 kcal/.test(buildContext(s)), 'Chat context sees the food of today: ' + buildContext(s).match(/ALIMENTAZIONE.*/));
+s = apply(s, { type: 'foodDelete', data: s.foods[0].id }); assert.equal(s.foods.length, 1);
 s = apply(s, { type: 'clearChat' }); assert.equal(s.messages.length, 0);
 s = apply(s, { type: 'reset' }); assert.equal(s.profile, null);
-console.log('Store: profile, validation, logging, check-in, week, chat, measurements, coach context and reset passed.');
+console.log('Store: profile, validation, logging, check-in, week, chat, measurements, food diary, coach context and reset passed.');
 
 // 9. Coach answers.
 const cs = { profile: base, plan: generatePlan(base), logs: [], checkins: [], decisions: [], messages: [], revision: 0 };
