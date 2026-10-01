@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic';
 type Turn = { role: 'user' | 'assistant'; text: string };
 type Card = { title: string; year: number; finding: string; coach_use: string };
 
-const MODELS = [process.env.GEMINI_MODEL || 'gemini-flash-latest', 'gemini-3.5-flash'];
+// Tried in order: an overloaded or missing model hands over to the next one.
+const MODELS = [...new Set([process.env.GEMINI_MODEL || 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'])];
 const hits = new Map<string, number[]>();
 
 const SYSTEM = `Sei Tempra, il coach personale dell'utente: un preparatore esperto di palestra, ricomposizione corporea, aumento della massa muscolare e dimagrimento. La palestra è la base; cardio e passi li decidi tu in base all'obiettivo.
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
       }).catch(() => null);
       if (!res) return Response.json({ error: 'Il coach non è raggiungibile: controlla la connessione.' }, { status: 502 });
       if (res.status === 400 && thinking) continue; // model without thinking levels: retry plainly
-      if (res.status === 404) break; // unknown model: try the next one
+      if (res.status === 404 || res.status === 429 || res.status >= 500) break; // unknown or overloaded model: try the next one
       const data = await res.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[]; error?: { message?: string } } | null;
       // No credit or a disabled key: answer like an unconfigured coach, so the app falls back to its local rules.
       if (res.status === 402 || res.status === 401 || res.status === 403) return Response.json({ error: 'not-configured', detail: data?.error?.message }, { status: 503 });
@@ -72,5 +73,5 @@ export async function POST(req: Request) {
       return Response.json({ text, model });
     }
   }
-  return Response.json({ error: 'Modello non disponibile.' }, { status: 502 });
+  return Response.json({ error: 'Il coach è molto richiesto in questo momento: riprova tra un minuto.' }, { status: 502 });
 }
