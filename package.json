@@ -1,0 +1,30 @@
+{
+  "name": "tempra",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tempra: coach di palestra, cardio e nutrizione basato sugli studi scientifici.",
+  "engines": { "node": ">=20.9.0" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "node tests/coach.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "1.31.0",
+    "next": "16.3.8",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "esbuild": "0.27.2",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.8",
+    "typescript": "5.9.3"
+  }
+}
