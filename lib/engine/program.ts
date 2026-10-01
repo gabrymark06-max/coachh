@@ -7,6 +7,8 @@ import { initialRunProgress, isBeginnerRunner, RUN_WALK, LONG_TARGET, maxLong } 
 import { buildCardioWeek, initialCardio, coreGoal, wantsRun, CARDIO_TARGET, STEPS_TARGET, type CardioWeek } from './cardio';
 import { schedule } from './schedule';
 import { nutrition, phaseFor, recommendPhase, bandOf } from './nutrition';
+import { suggest, history, bestE1rm, primeMovers } from './progression';
+import { muscleNames, type Muscle } from './exercises';
 
 export const id = () => crypto.randomUUID();
 export const now = () => new Date().toISOString();
@@ -75,7 +77,7 @@ function buildWeek(p: Profile, pr: Progress, prev?: Plan | null): Built {
   const g = gate(p);
   const deload = isDeload(pr);
   const cautious = (p.stress ?? 1) >= 4 || (p.confidence ?? 3) <= 2 || (p.sleepHours ?? 8) < 6;
-  const ctx: Context = { deload, mesoWeek: pr.mesoWeek, mesoLength: pr.mesoLength, setBonus: pr.setBonus, cautious, moderateOnly: g.moderateOnly };
+  const ctx: Context = { deload, mesoWeek: pr.mesoWeek, mesoLength: pr.mesoLength, setBonus: pr.setBonus, cautious, moderateOnly: g.moderateOnly, block: pr.mesoCount, muscleBonus: pr.muscleBonus };
   const strength = buildStrengthWeek(p, splitFor(p, sc), ctx);
   const cardio = buildCardioWeek(p, rc, pr, strength.sessions, { deload, moderateOnly: g.moderateOnly, mesoWeek: pr.mesoWeek, shortSleep: (p.sleepHours ?? 8) < 6 });
   const coach = coaching(p);
@@ -163,7 +165,7 @@ function makeBlueprint(p: Profile, pr: Progress, sessions: Session[], strength: 
   const length = pr.mesoLength;
   const load = Array.from({ length }, (_, i) => (i === length - 1 ? 0.3 : 0.4 + (0.6 * i) / Math.max(1, length - 2)));
   const label = deload ? 'Scarico' : pr.mesoWeek === 1 ? 'Calibrazione' : 'Costruzione';
-  const summary = `${goalNames[goal]}: ${sc} sedute di palestra${rc ? ` e ${rc} di cardio` : ''} a settimana, ${p.minutes} minuti al massimo, ${cardio.steps.toLocaleString('it-IT')} passi al giorno. Dieta in fase di ${phaseNames[rec.phase].toLowerCase()}.`;
+  const summary = `${goalNames[goal]}: ${sc} sedute di palestra${rc ? ` e ${rc} di cardio` : ''} a settimana, ${p.minutes} minuti al massimo, ${cardio.steps.toLocaleString('it-IT')} passi al giorno.`;
   return { summary, pillars, weekly, habits, cardioPlan: cardio.summary, zones: zones(p), muscleSets: strength.muscleSets, safety, meso: { length, week: pr.mesoWeek, deload, label, load } };
 }
 
@@ -193,18 +195,22 @@ export function progressAfterLog(state: AppState, log: Pick<WorkoutLog, 'session
   const complete = log.completed !== false;
   const hard = (log.rpe ?? 0) >= (session.targetRpe ?? (session.type === 'run' ? 4 : 7)) + 2 || (log.readiness ?? 3) <= 2;
   if (!complete) add('Seduta parziale: nessun aumento', 'Il lavoro incompleto viene conservato. La prossima volta ripeti la stessa dose; non recuperare tutte le serie perse in una volta.', 'partial-hold', cite('progression'));
-  if (session.type === 'strength') for (const e of session.exercises) {
-    const sets = log.results.filter(x => x.exerciseId === e.id);
-    if (sets.length !== e.sets || !complete || hard) continue;
-    if (e.increment === 0) { add(`${e.name}: controlla la qualità`, e.unit === 'seconds' ? 'Quando tieni il tempo massimo con facilità, aggiungi 5–10 secondi o passa a una variante più difficile.' : 'Quando completi tutte le serie al limite alto con il RIR previsto, passa alla variante più difficile o aggiungi ripetizioni.', 'bodyweight-hold', cite('progression')); continue; }
-    if (!sets.every(x => x.weight !== null && x.rir !== null)) { add(`${e.name}: dati da completare`, 'Mancano carico o RIR: nessun aumento.', 'missing-data', cite('effort')); continue; }
-    const same = sets.every(x => x.weight === sets[0].weight);
-    if (same) e.load = sets[0].weight;
-    if (same && e.load && sets.every(x => x.reps >= e.high && (x.rir ?? 0) >= e.rir)) {
-      const increment = Math.min(e.increment, Math.max(0.5, Math.round(e.load * 0.05 * 2) / 2));
-      e.load = Math.round((e.load + increment) * 10) / 10;
-      add(`${e.name}: proposta ${e.load} kg`, `Tutte le serie al limite alto con il RIR previsto. Propongo +${increment} kg e ripartenza dal basso del range: arrotonda ai pesi disponibili.`, 'double-progression', cite('progression', 'effort'));
-    } else add(`${e.name}: mantieni il carico`, 'Completa il range allo sforzo previsto prima di aumentare: prima le ripetizioni, poi il peso.', 'hold', cite('progression'));
+  if (session.type === 'strength') {
+    const holds: string[] = [];
+    for (const e of session.exercises) {
+      const sets = log.results.filter(x => x.exerciseId === e.id);
+      if (!sets.length) continue;
+      if (e.increment > 0 && sets.some(x => x.weight === null)) { add(`${e.name}: manca il carico`, 'Segna i kg di ogni serie: senza non posso calcolare il prossimo carico.', 'missing-data', cite('autoregulation')); continue; }
+      const sg = suggest(e, history(state, e.name));
+      // No increase after a partial or too hard session: repeat the same load.
+      const held = (!complete || hard) && sg.kind === 'up';
+      const lastLoad = Math.max(0, ...sets.map(x => x.weight ?? 0)) || null;
+      e.load = held ? lastLoad : sg.load ?? e.load;
+      if (held || sg.kind === 'hold' || sg.kind === 'reps') holds.push(`${e.name}: ${e.load ? `${e.load.toLocaleString('it-IT')} kg · ` : ''}${held ? 'stesse ripetizioni' : sg.target}`);
+      else if (sg.kind === 'up') add(`${e.name}: prossima volta ${sg.load ? sg.load.toLocaleString('it-IT') + ' kg' : sg.target}`, sg.why, 'double-progression', cite('progression', 'autoregulation'));
+      else if (sg.kind === 'down') add(`${e.name}: scendi a ${sg.load?.toLocaleString('it-IT')} kg`, sg.why, 'load-down', cite('autoregulation'));
+    }
+    if (holds.length) add('Prossima volta, stesso carico', holds.join('\n'), 'hold', cite('progression'));
   }
   if (hard) {
     session.adaptation = 'Sforzo alto o disponibilità bassa: la prossima volta mantieni il carico e lascia una ripetizione in più in riserva; se si ripete, riduco il lavoro.';
@@ -221,11 +227,34 @@ export function progressAfterLog(state: AppState, log: Pick<WorkoutLog, 'session
   return out;
 }
 
+/** Change of the estimated 1RM per muscle: this week's performance of each lift against its previous one. */
+function muscleTrends(state: AppState, logs: WorkoutLog[]): { muscle: Muscle; change: number }[] {
+  const plan = state.plan!;
+  const ids = new Set(logs.map(l => l.id));
+  const acc = new Map<Muscle, number[]>();
+  for (const e of plan.sessions.flatMap(s => s.exercises)) {
+    if (e.increment === 0) continue;
+    const h = history({ plan, logs: state.logs }, e.name);
+    const nowIdx = h.findLastIndex(x => state.logs.some(l => ids.has(l.id) && l.date === x.date));
+    if (nowIdx < 1) continue;
+    const now = bestE1rm(h[nowIdx], e.rir), before = bestE1rm(h[nowIdx - 1], e.rir);
+    if (!now || !before) continue;
+    for (const m of primeMovers(e.family)) acc.set(m, [...(acc.get(m) ?? []), now / before - 1]);
+  }
+  return [...acc].map(([muscle, v]) => ({ muscle, change: v.reduce((a, b) => a + b, 0) / v.length }));
+}
+
+/** Morning weights from check-ins and measurements. */
+function weights(state: AppState) {
+  return [...state.checkins.filter(c => c.weight !== null).map(c => ({ date: c.date, w: c.weight! })), ...(state.measurements ?? []).filter(m => m.weight !== null).map(m => ({ date: m.date, w: m.weight! }))];
+}
+
 function nutritionReview(state: AppState): Decision | null {
   const p = state.profile;
   if (!p || !p.nutritionConsent || p.clinical) return null;
   const day = 86400000, t = Date.now();
-  const w = (from: number, to: number) => state.checkins.filter(c => c.weight !== null && t - Date.parse(c.date) >= from * day && t - Date.parse(c.date) < to * day).map(c => c.weight!);
+  const all = weights(state);
+  const w = (from: number, to: number) => all.filter(c => t - Date.parse(c.date) >= from * day && t - Date.parse(c.date) < to * day).map(c => c.w);
   const last = w(0, 7), before = w(7, 14);
   if (last.length < 2 || before.length < 2) return null;
   const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
@@ -259,11 +288,28 @@ export function nextWeek(state: AppState): Decision {
   const runOk = runLogs.length > 0 && runLogs.every(x => x.completed !== false && !x.pain && x.rpe <= 5 + (plan.sessions.find(s => s.id === x.sessionId)?.hard ? 3 : 0));
   const wasDeload = isDeload(pr);
   const changes: string[] = [];
+  const trends = muscleTrends(state, logs);
   // Strength volume
   if (wasDeload) { pr.setBonus = 0; changes.push('Dopo lo scarico riparte un nuovo blocco con i carichi già calibrati.'); }
   else if (reduce) { pr.setBonus = Math.max(0, pr.setBonus - 1); changes.push('Fatica alta in più check-in: tolgo una serie per muscolo.'); }
   else if (gymOk && completion >= 0.75) { pr.setBonus += 1; changes.push('Sedute di palestra completate allo sforzo previsto: +1 serie per muscolo (fino al tetto del tuo livello).'); }
   else changes.push('Palestra: stessa dose finché le sedute non sono complete allo sforzo previsto.');
+  // Per muscle: performance falling despite the work means too little recovery, so one set less; rising or flat keeps the global step.
+  if (wasDeload) pr.muscleBonus = {};
+  else if (!reduce && trends.length) {
+    const mb = { ...(pr.muscleBonus ?? {}) };
+    const grew = gymOk && completion >= 0.75;
+    const lines: string[] = [];
+    for (const t of trends) {
+      const name = muscleNames[t.muscle];
+      const pct = `${t.change >= 0 ? '+' : ''}${(t.change * 100).toFixed(1).replace('.', ',')}%`;
+      if (t.change <= -0.025) { mb[t.muscle] = Math.max(-3, (mb[t.muscle] ?? 0) - (grew ? 2 : 1)); lines.push(`${name} ${pct}: una serie in meno per recuperare`); }
+      else if (t.change >= 0.01) lines.push(`${name} ${pct}`);
+      else lines.push(`${name} fermo`);
+    }
+    pr.muscleBonus = mb;
+    changes.push(`Forza stimata rispetto alla volta prima: ${lines.join('; ')}.`);
+  }
   // Cardio and steps: grow towards the goal dose only after a week that went well.
   const goal = coreGoal(p);
   const cardioDone = runLogs.length === 0 || runOk;

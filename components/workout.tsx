@@ -1,17 +1,124 @@
 'use client';
-import {useEffect,useState,type ReactNode} from 'react';
-import {Check} from 'lucide-react';
-import type {Profile,Session,SetResult} from '../lib/types';
-import {dayNames} from '../lib/types';
-import {alternatives, howTo} from '../lib/planner';
-function Field({label,children}:{label:string;children:ReactNode}){return <label className="field"><span>{label}</span>{children}</label>}
-export default function Workout({session:s,profile:p,changeVariant,busy,save}:{session:Session;profile:Profile;changeVariant:(x:unknown)=>unknown;busy:boolean;save:(x:unknown)=>unknown}){
- const [r,setR]=useState<SetResult[]>(s.exercises.flatMap(e=>Array.from({length:e.sets},(_,i)=>({exerciseId:e.id,set:i+1,weight:e.load,reps:0,rir:null}))));const [recorded,setRecorded]=useState<Record<number,boolean>>({}),[complete,setComplete]=useState(true),[seconds,setSeconds]=useState(0),[running,setRunning]=useState(false),[readiness,setReadiness]=useState(3);
- useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(x=>x+1),1000);return()=>clearInterval(t)},[running]);
- return <form onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);save({sessionId:s.id,duration:Number(d.get('duration')),rpe:Number(d.get('rpe')),pain:d.get('pain')==='on',distance:d.get('distance')?Number(d.get('distance')):null,note:d.get('note'),completed:complete,readiness:Number(d.get('readiness')),enjoyment:d.get('enjoyment')?Number(d.get('enjoyment')):null,confidence:d.get('confidence')?Number(d.get('confidence')):null,barrier:d.get('barrier'),actualRunMinutes:d.get('actualRunMinutes')?Number(d.get('actualRunMinutes')):null,results:r.filter((_,i)=>recorded[i])});}}>
- <div className="sectionheading"><span className="tag">{dayNames[s.day]} · {s.duration} min stimati · RPE {s.targetRpe??'—'}</span><button type="button" className="secondary" onClick={()=>setRunning(!running)}>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')} · {running?'Pausa':'Avvia timer'}</button></div><p>{s.rationale}</p>{s.coaching&&<p className="note">{s.coaching}</p>}{s.adaptation&&<p className="adaptation"><strong>Dal feedback precedente:</strong> {s.adaptation}</p>}
- <Field label="Prima di partire: disponibilità fisica oggi · 1 bassa, 5 alta"><select name="readiness" value={readiness} onChange={e=>setReadiness(Number(e.target.value))}>{[1,2,3,4,5].map(x=><option key={x}>{x}</option>)}</select></Field><>{readiness<=2&&<p className="note">Oggi segnali disponibilità bassa: mantieni uno sforzo più facile, evita aumenti e scegli «Parziale» se riduci il lavoro. Se avverti dolore, interrompi. Questa è una guida prudente, non una valutazione clinica.</p>}</><p className="formhint">Se avverti dolore o malessere, interrompi e registra il problema nel check-in. Un valore di disponibilità non è una diagnosi.</p>
- <div className="phases">{(s.type==='strength'?s.phases.slice(0,1):s.phases).map((x:{label:string;minutes:number;effort:string},i:number)=><div key={i}><span>{String(i+1).padStart(2,'0')}</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes} min</strong></div>)}</div>
- {s.type==='strength'&&<><p className="note">I carichi proposti sono indicativi. Registra le serie effettive e spunta «Fatta». Per i manubri indica i kg di un singolo manubrio. Prima seduta: scegli un carico con cui arrivi al limite alto del range lasciando il RIR indicato. Cambiare variante richiede una nuova calibrazione.</p>{s.exercises.map(e=><section className="exercise" key={e.id}><h3>{e.name}</h3><small>{e.sets} × {e.low}–{e.high}{e.unit==='seconds'?' secondi':''} · {e.unit==='seconds'?'posizione stabile':e.family==='plyo'?'contatti rapidi, lontano dalla fatica':`RIR ${e.rir}`} · recupero {e.rest} s{e.load!==null?` · ${e.load} kg`:''}</small><p>{e.cue}</p>{(()=>{const h=howTo(e.name);return h?<details className="howto"><summary>Come si esegue</summary><p><b>Posizione:</b> {h.setup}</p><ol>{h.steps.map((x,i)=><li key={i}>{x}</li>)}</ol><p className="mistakes"><b>Errori da evitare:</b> {h.mistakes.join(' · ')}</p>{e.family!=='core'&&e.family!=='plyo'&&<p className="tempo">Ritmo: 2–3 secondi in discesa{h.stretch?', pausa di un secondo nel punto di massimo allungamento':''}, salita decisa ma controllata.</p>}</details>:null})()}{alternatives(p,e).length>1&&<Field label="Variante preferita per questa seduta"><select disabled={busy} value={e.name} onChange={ev=>{if(Object.values(recorded).some(Boolean)&&!confirm('Cambiare variante azzera le serie non ancora salvate. Continuare?'))return;changeVariant({sessionId:s.id,exerciseId:e.id,name:ev.target.value})}}>{alternatives(p,e).map(n=><option key={n}>{n}</option>)}</select></Field>}<div className="setheader"><span>Fatta</span><span>Kg</span><span>{e.unit==='seconds'?'Secondi':'Ripetizioni'}</span><span>RIR</span></div>{r.map((x,i)=>x.exerciseId===e.id?<div className="setrow" key={i}><label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev=>setRecorded(v=>({...v,[i]:ev.target.checked}))}/><span>{x.set}</span></label>{(['weight','reps','rir'] as const).map(k=><input key={k} disabled={(k==='weight'&&e.increment===0)||(k==='rir'&&(e.unit==='seconds'||e.family==='plyo'))} aria-label={`${e.name} serie ${x.set} ${k}`} type="number" min={0} max={k==='weight'?400:k==='reps'?300:10} step={k==='weight'?'.5':'1'} placeholder={k==='weight'?'Calibra':'Reale'} value={k==='reps'&&x.reps===0?'':x[k]??''} onChange={ev=>setR(a=>a.map((v,j)=>j===i?{...v,[k]:ev.target.value?Number(ev.target.value):k==='reps'?0:null}:v))}/>)}</div>:null)}</section>)}</>}
- {s.type==='strength'&&s.phases.length>1&&<div className="phases">{s.phases.slice(1).map((x,i)=><div key={i}><span>{String(s.exercises.length+i+2).padStart(2,'0')}</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes} min</strong></div>)}</div>}<h3>Come è andata, davvero?</h3><div className="formgrid"><Field label="Completamento"><select value={complete?'full':'partial'} onChange={e=>setComplete(e.target.value==='full')}><option value="full">Seduta completa</option><option value="partial">Parziale / interrotta</option></select></Field><Field label="Durata effettiva in minuti"><input name="duration" type="number" min={1} max={240} required placeholder={String(s.duration)}/></Field><Field label="Sforzo globale RPE · 1–10"><input name="rpe" type="number" min={1} max={10} required placeholder={'Obiettivo '+(s.targetRpe??6)}/></Field>{s.type==='run'&&<><Field label="Minuti effettivi del blocco principale"><input name="actualRunMinutes" type="number" min={0} max={240} placeholder={String(s.runMinutes??'')}/></Field><Field label="Distanza km (facoltativa)"><input name="distance" type="number" min={0} max={100} step=".01"/></Field></>}<Field label="Gradimento · 1 basso, 5 alto"><select name="enjoyment" defaultValue=""><option value="">Preferisco non indicarlo</option>{[1,2,3,4,5].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Fiducia nella prossima seduta · 1–5"><select name="confidence" defaultValue=""><option value="">Preferisco non indicarla</option>{[1,2,3,4,5].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="L’ostacolo di oggi"><select name="barrier"><option value="none">Nessuno</option><option value="time">Tempo</option><option value="fatigue">Fatica</option><option value="boredom">Noia / poco gradimento</option></select></Field></div><label className="check"><input type="checkbox" name="pain"/> Ho avvertito dolore nella seduta</label><Field label="Cosa manterresti o cambieresti?"><textarea name="note" maxLength={1000}/></Field>{s.type==='strength'&&complete&&r.some((_,i)=>!recorded[i])&&<p className="note">Spunta le serie completate oppure seleziona «Parziale». Non registriamo risultati inventati.</p>}<button className="primary" disabled={busy||(s.type==='strength'&&complete&&r.some((_,i)=>!recorded[i]))}>Salva e ricevi il feedback <Check size={16}/></button></form>
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Check, Flame, Timer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { AppState, Profile, Session, SetResult } from '../lib/types';
+import { alternatives, howTo, suggest, history, rampSets, warmupFor, type Suggestion } from '../lib/planner';
+
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="field"><span>{label}</span>{children}</label>; }
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const nowMs = () => Date.now();
+const kg = (x: number) => `${x.toLocaleString('it-IT')} kg`;
+const rpeLabels: Record<number, string> = { 4: 'facile', 5: 'moderato', 6: 'impegnativo', 7: 'duro', 8: 'molto duro', 9: 'quasi al limite', 10: 'massimo' };
+
+export default function Workout({ session: s, profile: p, state, deload, changeVariant, save }: { session: Session; profile: Profile; state: AppState; deload: boolean; changeVariant: (x: unknown) => unknown; save: (x: unknown) => unknown }) {
+  const tips = useMemo(() => Object.fromEntries(s.exercises.map(e => [e.id, suggest(e, history(state, e.name), { deload })])) as Record<string, Suggestion>, [s, state, deload]);
+  const [r, setR] = useState<SetResult[]>(() => s.exercises.flatMap(e => Array.from({ length: e.sets }, (_, i) => ({ exerciseId: e.id, set: i + 1, weight: tips[e.id]?.load ?? e.load, reps: 0, rir: null }))));
+  const [recorded, setRecorded] = useState<Record<number, boolean>>({});
+  const [complete, setComplete] = useState(true);
+  const [seconds, setSeconds] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
+  const [now, setNow] = useState(nowMs);
+  const [dur, setDur] = useState<string | null>(null);
+
+  useEffect(() => { if (!running) return; const t = setInterval(() => setSeconds(x => x + 1), 1000); return () => clearInterval(t); }, [running]);
+  useEffect(() => {
+    if (!rest) return;
+    const t = setInterval(() => {
+      const n = nowMs(); setNow(n);
+      if (n >= rest.until) { setRest(null); try { navigator.vibrate?.([200, 100, 200]); } catch { /* not supported */ } }
+    }, 250);
+    return () => clearInterval(t);
+  }, [rest]);
+
+  const strength = s.type === 'strength';
+  const total = s.exercises.reduce((t, e) => t + e.sets, 0);
+  const warm = strength ? warmupFor(s, p) : null;
+  const missing = strength && complete && r.some((_, i) => !recorded[i]);
+  const tick = (i: number, on: boolean, restSec: number) => {
+    setRecorded(v => ({ ...v, [i]: on }));
+    if (on) { const t = nowMs(); setRest({ until: t + restSec * 1000, total: restSec }); setNow(t); if (!running) setRunning(true); }
+  };
+
+  return <form className="workout" onSubmit={e => {
+    e.preventDefault();
+    const d = new FormData(e.currentTarget);
+    save({ sessionId: s.id, duration: Number(d.get('duration')), rpe: Number(d.get('rpe')), pain: d.get('pain') === 'on', distance: d.get('distance') ? Number(d.get('distance')) : null, note: String(d.get('note') ?? ''), completed: complete, readiness: 3, actualRunMinutes: d.get('actualRunMinutes') ? Number(d.get('actualRunMinutes')) : null, results: r.filter((_, i) => recorded[i]) });
+  }}>
+    <div className="wtop">
+      <span className="tag">{s.duration} min{strength ? ` · ${total} serie` : ''}{deload ? ' · scarico' : ''}</span>
+      <button type="button" className="secondary" onClick={() => setRunning(!running)}><Timer size={16} /> {clock(seconds)} · {running ? 'Pausa' : 'Avvia'}</button>
+    </div>
+    {s.adaptation && <p className="adaptation">{s.adaptation}</p>}
+
+    {warm && <section className="warmup">
+      <h3><Flame size={18} /> Riscaldamento</h3>
+      <ol>
+        <li><b>{warm.general}</b></li>
+        {warm.drills.map(x => <li key={x.name}>{x.name} <span>{x.dose}</span></li>)}
+        <li>Poi le serie di avvicinamento indicate sui primi esercizi.</li>
+      </ol>
+    </section>}
+
+    {!strength && <div className="phases">{s.phases.map((x, i) => <div key={i}><span>{String(i + 1).padStart(2, '0')}</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes}′</strong></div>)}</div>}
+
+    {strength && s.exercises.map((e, ei) => {
+      const tip = tips[e.id];
+      const h = howTo(e.name);
+      const alts = alternatives(p, e);
+      const firstOfPattern = e.role === 'main' && e.increment > 0 && (ei === 0 || s.exercises.slice(0, ei).every(x => x.family !== e.family)) && ei < 3;
+      const ramp = firstOfPattern ? rampSets(e.name, tip.load, e.low) : [];
+      const Icon = tip.kind === 'up' ? TrendingUp : tip.kind === 'down' ? TrendingDown : Minus;
+      return <section className="exercise" key={e.id}>
+        <div className="exhead">
+          <span className="exnum num">{String(ei + 1).padStart(2, '0')}</span>
+          <div><h3>{e.name}</h3><small className="num">{e.sets} × {e.low}–{e.high}{e.unit === 'seconds' ? ' s' : ''}{e.family === 'plyo' || e.unit === 'seconds' ? '' : ` · RIR ${e.rir}`} · recupero {e.rest >= 120 ? `${e.rest / 60}′` : `${e.rest}″`}</small></div>
+        </div>
+        <div className={'target ' + tip.kind}>
+          <Icon size={18} />
+          <div>
+            <strong>{tip.load ? <>Oggi {kg(tip.load)} <span>· {tip.target}</span></> : tip.kind === 'start' && e.increment > 0 ? 'Prima volta: trova il carico' : `Obiettivo: ${tip.target}`}</strong>
+            {tip.last && <small>Ultima volta: {tip.last}</small>}
+            <small>{tip.why}</small>
+          </div>
+        </div>
+        {ramp.length > 0 && <p className="ramp"><b>Avvicinamento</b> {ramp.join(' → ')}</p>}
+        <div className="setheader"><span>Serie</span><span>Kg</span><span>{e.unit === 'seconds' ? 'Secondi' : 'Ripetizioni'}</span><span>RIR</span></div>
+        {r.map((x, i) => x.exerciseId === e.id ? <div className={'setrow' + (recorded[i] ? ' done' : '')} key={i}>
+          <label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev => tick(i, ev.target.checked, e.rest)} /><span>{x.set}</span></label>
+          {(['weight', 'reps', 'rir'] as const).map(k => <input key={k} disabled={(k === 'weight' && e.increment === 0) || (k === 'rir' && (e.unit === 'seconds' || e.family === 'plyo'))} aria-label={`${e.name} serie ${x.set} ${k}`} type="number" inputMode="decimal" min={0} max={k === 'weight' ? 400 : k === 'reps' ? 300 : 10} step={k === 'weight' ? '.5' : '1'} placeholder={k === 'weight' ? (e.increment === 0 ? '—' : 'kg') : k === 'reps' ? String(e.high) : String(e.rir)} value={k === 'reps' && x.reps === 0 ? '' : x[k] ?? ''} onChange={ev => setR(a => a.map((v, j) => j === i ? { ...v, [k]: ev.target.value ? Number(ev.target.value) : k === 'reps' ? 0 : null } : (k === 'weight' && v.exerciseId === e.id && j > i && !recorded[j] ? { ...v, weight: ev.target.value ? Number(ev.target.value) : null } : v)))} />)}
+        </div> : null)}
+        {h && <details className="howto"><summary>Tecnica{alts.length > 1 ? ' e alternative' : ''}</summary>
+          <p>{h.setup}</p>
+          <ol>{h.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
+          <p className="mistakes"><b>Evita:</b> {h.mistakes.join(' · ')}</p>
+          {e.family !== 'core' && e.family !== 'plyo' && <p className="tempo">Discesa in 2–3 secondi{h.stretch ? ', un secondo di pausa in allungamento' : ''}, salita decisa.</p>}
+          {alts.length > 1 && <Field label="Macchina occupata o non ti piace? Cambia esercizio"><select value={e.name} onChange={ev => { if (Object.values(recorded).some(Boolean) && !confirm('Cambiare esercizio azzera le serie non ancora salvate. Continuare?')) return; changeVariant({ sessionId: s.id, exerciseId: e.id, name: ev.target.value }); }}>{alts.map(n => <option key={n}>{n}</option>)}</select></Field>}
+        </details>}
+      </section>;
+    })}
+
+    {strength && s.phases.length > 2 && <div className="phases">{s.phases.slice(1, -1).map((x, i) => <div key={i}><span>+</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes}′</strong></div>)}</div>}
+
+    <section className="finish">
+      <h3>Com’è andata?</h3>
+      <div className="formgrid">
+        <Field label="Seduta"><select value={complete ? 'full' : 'partial'} onChange={e => setComplete(e.target.value === 'full')}><option value="full">Completa</option><option value="partial">Parziale</option></select></Field>
+        <Field label="Durata (minuti)"><input name="duration" type="number" inputMode="numeric" min={1} max={240} required placeholder={String(s.duration)} value={dur ?? (seconds >= 60 ? String(Math.round(seconds / 60)) : '')} onChange={e => setDur(e.target.value)} /></Field>
+        <Field label="Fatica complessiva"><select name="rpe" required defaultValue=""><option value="" disabled>Scegli</option>{[4, 5, 6, 7, 8, 9, 10].map(x => <option key={x} value={x}>{x} · {rpeLabels[x]}</option>)}</select></Field>
+        {s.type === 'run' && <><Field label="Minuti di cardio fatti"><input name="actualRunMinutes" type="number" min={0} max={240} placeholder={String(s.runMinutes ?? '')} /></Field><Field label="Distanza km (facoltativa)"><input name="distance" type="number" min={0} max={100} step=".01" /></Field></>}
+      </div>
+      <label className="check"><input type="checkbox" name="pain" /> <span>Ho sentito dolore (non il normale bruciore)</span></label>
+      <Field label="Note per il coach (facoltative)"><textarea name="note" maxLength={1000} placeholder="Es. panca: spalla un po’ rigida, squat facile" /></Field>
+      {missing && <p className="note">Spunta tutte le serie, oppure scegli «Parziale».</p>}
+      <button className="primary big" disabled={missing}>Salva <Check size={18} /></button>
+    </section>
+
+    {rest && <div className="resttimer" role="status">
+      <span>Recupero</span><strong className="num">{clock(Math.max(0, Math.ceil((rest.until - now) / 1000)))}</strong>
+      <span className="restbar"><span style={{ width: `${Math.max(0, Math.min(100, (rest.until - now) / (rest.total * 10)))}%` }} /></span>
+      <button type="button" onClick={() => setRest({ until: rest.until + 30000, total: rest.total + 30 })}>+30″</button>
+      <button type="button" onClick={() => setRest(null)}>Salta</button>
+    </div>}
+  </form>;
 }

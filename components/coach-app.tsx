@@ -1,13 +1,17 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, X, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles } from 'lucide-react';
-import { type AppState, type Session, type Decision, type Plan, type Profile, emptyState, dayNames, goalNames } from '../lib/types';
+import { Dumbbell, Footprints, MessageCircle, Utensils, CalendarDays, Gauge, ArrowUpRight, UserRound, Check, X, Plus, ShieldCheck, Download, Upload, Trash2, Flame, Moon, Activity, ArrowRight, Sparkles, ChartLine, SendHorizontal, Eraser } from 'lucide-react';
+import { type AppState, type Session, type Decision, type Plan, type Profile, type Measurement, emptyState, dayNames, goalNames } from '../lib/types';
 import { nutrition, muscleNames, activityFrom, coreGoal, type NutritionPlan } from '../lib/planner';
 import { load, save, apply, type Action } from '../lib/store';
 import Workout from './workout';
 import { Questionnaire, defaults } from './questionnaire';
+import { Progress, MeasureForm } from './progress';
+import { buildContext, evidenceFor } from '../lib/context';
+import { answer } from '../lib/coach';
+import { clearPhotos, deletePhotos } from '../lib/photos';
 
-const tabs = [['home', 'Oggi', Gauge], ['plan', 'Allenamento', CalendarDays], ['food', 'Dieta', Utensils], ['chat', 'Coach', MessageCircle]] as const;
+const tabs = [['home', 'Oggi', Gauge], ['plan', 'Allenamento', CalendarDays], ['progress', 'Progressi', ChartLine], ['food', 'Dieta', Utensils], ['chat', 'Coach', MessageCircle]] as const;
 
 function todayIndex() {
   const w = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Europe/Rome' }).format(new Date());
@@ -30,9 +34,34 @@ export default function CoachApp() {
   const [welcome, setWelcome] = useState(true);
   const [reveal, setReveal] = useState(false);
   const [dayKind, setDayKind] = useState<'training' | 'rest'>('training');
+  const [measure, setMeasure] = useState<Measurement | 'new' | null>(null);
+  const [pending, setPending] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const setS = (next: AppState) => { setRaw(next); try { save(next); } catch (e) { setError((e as Error).message); } };
+  const update = (fn: (prev: AppState) => AppState) => setRaw(prev => { const next = fn(prev); try { save(next); } catch { /* reported on the next action */ } return next; });
+  useEffect(() => { if (tab === 'chat') endRef.current?.scrollIntoView({ block: 'end' }); }, [tab, s.messages.length, pending]);
+
+  /** Ask the coach: Gemini on the server with the person's data and the relevant evidence; local rules if the AI is not configured. */
+  async function ask(q: string) {
+    const text = q.trim();
+    if (!text || pending) return;
+    setError('');
+    let base: AppState;
+    try { base = apply(s, { type: 'message', data: { role: 'user', text } }); } catch (e) { setError((e as Error).message); return; }
+    setS(base); setChat(''); setPending(true);
+    let reply: { text: string; mode: string } | null = null;
+    try {
+      const res = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: base.messages.slice(-16).map(m => ({ role: m.role, text: m.text })), context: buildContext(base), evidence: evidenceFor(text) }) });
+      const data = await res.json().catch(() => ({})) as { text?: string; error?: string };
+      if (res.ok && data.text) reply = { text: data.text, mode: 'ai' };
+      else if (res.status === 503 || res.status === 404) reply = { text: answer(text, base).text, mode: 'local' };
+      else setError(data.error ?? 'Il coach non ha risposto. Riprova.');
+    } catch { reply = { text: answer(text, base).text, mode: 'local' }; }
+    if (reply) { const r = reply; update(prev => apply(prev, { type: 'message', data: { role: 'assistant', text: r.text, mode: r.mode } })); }
+    setPending(false);
+  }
 
   function act(action: Action) {
     setError('');
@@ -133,17 +162,23 @@ export default function CoachApp() {
 
         {!reveal && tab === 'food' && p && n && <Diet n={n} p={p} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} />}
 
+        {!reveal && tab === 'progress' && <Progress state={s} add={() => setMeasure('new')} edit={m => setMeasure(m)} remove={m => { if (confirm(`Eliminare la misurazione del ${new Date(m.date + 'T12:00:00').toLocaleDateString('it-IT')}${Object.keys(m.photos).length ? ' e le sue foto' : ''}?`)) { act({ type: 'measureDelete', data: m.id }); deletePhotos(Object.values(m.photos)); } }} />}
+
         {!reveal && tab === 'chat' && <>
-          <Heading label="Il tuo coach" title="Chiedi pure." description="Risponde in base al tuo piano, al diario e a quello che dicono gli studi." />
+          <Heading label="Il tuo coach" title="Chiedi pure." description="Conosce il tuo piano, i carichi, il diario e le misure.">
+            {s.messages.length > 0 && <button className="secondary" onClick={() => { if (confirm('Cancellare la conversazione?')) act({ type: 'clearChat' }); }}><Eraser size={16} /> Nuova chat</button>}
+          </Heading>
           <section className="panel chatpanel">
             <div className="chatmessages" aria-live="polite">
               {!s.messages.length && <div className="chatintro"><MessageCircle size={30} /><h2>Su cosa ti serve una mano?</h2>
-                <div className="chiprow center">{['Cosa faccio oggi?', 'Perché questa fase della dieta?', 'Devo fare cardio?', 'Quante proteine?', 'Come aumento i carichi?'].map(q => <button className="chip" key={q} onClick={() => act({ type: 'chat', data: q }) && setChat('')}>{q}</button>)}</div></div>}
-              {s.messages.map(m => <div className={'message ' + m.role} key={m.id}><p>{m.text}</p></div>)}
+                <div className="chiprow center">{['Che carico metto oggi?', 'Come sto andando?', 'Il cardio mi serve?', 'Cosa mangio dopo l’allenamento?', 'Posso cambiare un esercizio?'].map(q => <button className="chip" key={q} onClick={() => ask(q)}>{q}</button>)}</div></div>}
+              {s.messages.map(m => <div className={'message ' + m.role} key={m.id}><Rich text={m.text} />{m.mode === 'local' && <small className="mode">Risposta base: la chat AI non è ancora attiva.</small>}</div>)}
+              {pending && <div className="message assistant typing" aria-label="Il coach sta scrivendo"><span /><span /><span /></div>}
+              <div ref={endRef} />
             </div>
-            <form className="chatinput" onSubmit={e => { e.preventDefault(); if (chat.trim() && act({ type: 'chat', data: chat })) setChat(''); }}>
-              <input aria-label="Messaggio al coach" value={chat} onChange={e => setChat(e.target.value)} maxLength={2000} placeholder="Scrivi una domanda" />
-              <button className="primary" disabled={!chat.trim()}>Invia</button>
+            <form className="chatinput" onSubmit={e => { e.preventDefault(); ask(chat); }}>
+              <input aria-label="Messaggio al coach" value={chat} onChange={e => setChat(e.target.value)} maxLength={2000} placeholder="Scrivi al coach" />
+              <button className="primary" disabled={!chat.trim() || pending} aria-label="Invia"><SendHorizontal size={18} /></button>
             </form>
           </section>
         </>}
@@ -158,9 +193,10 @@ export default function CoachApp() {
         <button className="secondary" onClick={() => { const u = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = u; a.download = 'tempra-dati.json'; a.click(); URL.revokeObjectURL(u); }}><Download size={16} /> Esporta i dati</button>
         <button className="secondary" onClick={() => fileRef.current?.click()}><Upload size={16} /> Importa</button>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={e => e.target.files?.[0] && importData(e.target.files[0])} />
-        <button className="danger" onClick={() => { if (confirm('Eliminare profilo, piano e diario da questo dispositivo?')) { act({ type: 'reset' }); setEdit(false); setWelcome(true); } }}><Trash2 size={16} /> Elimina tutto</button>
+        <button className="danger" onClick={() => { if (confirm('Eliminare profilo, piano e diario da questo dispositivo?')) { act({ type: 'reset' }); clearPhotos(); setEdit(false); setWelcome(true); } }}><Trash2 size={16} /> Elimina tutto</button>
       </div></>, () => setEdit(false))}
-    {session && modal(session.title, <Workout key={session.exercises.map(x => x.id).join(',')} profile={p} changeVariant={data => act({ type: 'variant', data: data as { sessionId: string; exerciseId: string; name: string } })} session={session} busy={false} save={x => { if (act({ type: 'log', data: x as never })) setSession(null); }} />, () => setSession(null))}
+    {measure && modal(measure === 'new' ? 'Nuova misurazione' : 'Modifica misurazione', <MeasureForm initial={measure === 'new' ? null : measure} save={m => { if (act({ type: 'measure', data: m })) setMeasure(null); else throw Error('Controlla i valori inseriti.'); }} />, () => setMeasure(null))}
+    {session && modal(session.title, <Workout key={session.exercises.map(x => x.id).join(',')} profile={p} state={s} deload={!!bp?.meso.deload} changeVariant={data => act({ type: 'variant', data: data as { sessionId: string; exerciseId: string; name: string } })} session={session} save={x => { if (act({ type: 'log', data: x as never })) setSession(null); }} />, () => setSession(null))}
     {check && modal('Come stai oggi?', <CheckIn save={v => { if (act({ type: 'checkin', data: v as never })) setCheck(false); }} />, () => setCheck(false))}
     {review && modal('Il commento del coach', <>{review.map(d => <div className="decision" key={d.id}><h3>{d.title}</h3><p>{d.reason}</p></div>)}</>, () => setReview(null))}
   </div>;
@@ -220,25 +256,18 @@ function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s: Sessi
       <section>
         <div className="sectionheading"><h2>Questa settimana</h2><small>{plan.sessions.length} allenamenti</small></div>
         {plan.sessions.map(card)}
-        {plan.notes.map((x, i) => <p className="note" key={i}>{x}</p>)}
         <button className="primary" onClick={onNext} style={{ marginTop: 8 }}>Chiudi la settimana e aggiorna</button>
       </section>
       {bp && <section className="stack">
         <div className="panel dark"><div className="eyebrow">Il blocco · {bp.meso.label}</div><TemperCurve meso={bp.meso} /></div>
         <div className="panel"><h2>Serie a settimana per muscolo</h2>
           <div className="musclebars">{Object.entries(bp.muscleSets).filter(([, v]) => v > 0).map(([m, v]) => <div className="musclebar" key={m}><span>{muscleNames[m as keyof typeof muscleNames]}</span><span className="track"><span style={{ width: `${(v / max) * 100}%` }} /></span><strong>{v}</strong></div>)}</div>
-          <p className="note">Gli esercizi multiarticolari contano mezza serie per i muscoli che lavorano in modo indiretto.</p>
         </div>
-        <div className="panel"><h2>Intensità del cardio</h2>
-          {bp.zones.map(z => <div className="zone" key={z.name}><strong>{z.name}</strong><span>{z.talk} · {z.rpe}</span><small>{z.hr ? `circa ${z.hr}` : ''}</small></div>)}
-        </div>
+        {plan.sessions.some(x => x.type === 'run') && <div className="panel"><h2>Intensità del cardio</h2>
+          {bp.zones.slice(0, 2).map(z => <div className="zone" key={z.name}><strong>{z.name}</strong><span>{z.talk} · {z.rpe}</span><small>{z.hr ? `circa ${z.hr}` : ''}</small></div>)}
+        </div>}
       </section>}
     </div>
-    {bp && <>
-      <div className="sectionheading" style={{ marginTop: 32 }}><h2>Perché è fatto così</h2></div>
-      <div className="pillars">{bp.pillars.map(x => <div className="pillar" key={x.title}><h3>{x.title}</h3><p>{x.detail}</p></div>)}</div>
-      <section className="panel" style={{ marginTop: 16 }}><div className="eyebrow"><ShieldCheck size={14} /> Quando fermarsi</div><ul className="safety">{bp.safety.map(x => <li key={x}>{x}</li>)}</ul></section>
-    </>}
   </>;
 }
 
@@ -322,6 +351,23 @@ function Welcome({ begin }: { begin: () => void }) {
     </div>
     <small className="fine">Basato sugli studi scientifici più solidi su allenamento e nutrizione. Nessun account: i dati restano sul tuo telefono. Per adulti.</small>
   </section>;
+}
+
+/** Minimal formatting for coach replies: paragraphs, bullet lists and **bold**. */
+function Rich({ text }: { text: string }) {
+  const bold = (line: string) => line.split(/(\*\*[^*]+\*\*)/g).map((part, i) => part.startsWith('**') && part.endsWith('**') ? <b key={i}>{part.slice(2, -2)}</b> : part.replace(/\*\*/g, ''));
+  const blocks: ReactNode[] = [];
+  let items: string[] = [];
+  const flush = () => { if (items.length) { blocks.push(<ul key={blocks.length}>{items.map((x, i) => <li key={i}>{bold(x)}</li>)}</ul>); items = []; } };
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    const m = line.match(/^(?:[•\-*]|\d+[.)])\s+(.*)$/);
+    if (m) { items.push(m[1]); continue; }
+    flush();
+    if (line) blocks.push(<p key={blocks.length}>{bold(line.replace(/^#+\s*/, ''))}</p>);
+  }
+  flush();
+  return <>{blocks}</>;
 }
 
 function Heading({ label, title, description, children }: { label: string; title: string; description: string; children?: ReactNode }) {

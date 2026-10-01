@@ -54,17 +54,25 @@ export type Blueprint = {
 export type Progress = {
   mesoWeek: number; mesoLength: number; mesoCount: number; setBonus: number; runMinutes: number; longRun: number;
   eventWeeks: number | null; runWalkStep: number; steps?: number; cardioMinutes?: number;
+  /** Extra weekly sets per muscle decided from performance trends (can be negative). */
+  muscleBonus?: Record<string, number>;
 };
 export type Plan = {
   id: string; createdAt: string; version: number; week: number; sessions: Session[]; notes: string[]; blocked: boolean;
   engineVersion?: number; blueprint?: Blueprint; progress?: Progress;
 };
-export type SetResult = { exerciseId: string; set: number; weight: number | null; reps: number; rir: number | null };
+export type SetResult = { exerciseId: string; set: number; weight: number | null; reps: number; rir: number | null; name?: string };
 export type WorkoutLog = { id: string; sessionId: string; title: string; type: 'strength' | 'run'; date: string; duration: number; rpe: number; pain: boolean; distance: number | null; results: SetResult[]; note: string; week: number; completed?: boolean; enjoyment?: number | null; confidence?: number | null; barrier?: 'none' | 'time' | 'fatigue' | 'boredom'; actualRunMinutes?: number | null; readiness?: number; plannedDuration?: number; plannedRpe?: number; plannedRunMinutes?: number; feedback?: Decision[] };
 export type CheckIn = { id: string; date: string; sleep: number; fatigue: number; soreness: number; pain: boolean; note: string; weight: number | null };
 export type Decision = { id: string; date: string; title: string; reason: string; sources: string[]; rule: string };
 export type Message = { id: string; role: 'user' | 'assistant'; text: string; sources: string[]; date: string; mode?: string };
-export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; revision: number };
+export type Pose = 'front' | 'side' | 'back';
+/** Body measurements in cm (weight in kg); photos are keys of images kept in this browser's IndexedDB. */
+export type Measurement = {
+  id: string; date: string; weight: number | null; waist: number | null; chest: number | null; arm: number | null; thigh: number | null; hips: number | null;
+  note: string; photos: Partial<Record<Pose, string>>;
+};
+export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; revision: number };
 export type Paper = { id: string; title: string; authors: string; year: number; doi: string; pmid: string; url: string; topics: string[]; study_type: string; population: string; finding: string; limitations: string; coach_use: string; access_level: string; oa_full_text_url: string; collections: string[] };
 export const dayNames = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 export const goalNames: Record<Goal, string> = { 'fat-loss': 'Dimagrire', recomp: 'Ricomposizione corporea', muscle: 'Mettere massa', strength: 'Diventare più forte', health: 'Stare in forma', balanced: 'Ricomposizione corporea', running: 'Stare in forma' };
@@ -81,4 +89,5 @@ export const screeningNames: Record<ScreeningFlag, string> = {
   meds: 'Assumo farmaci per una condizione cronica',
   pregnancy: 'Sono in gravidanza o nel post-parto',
 };
-export const emptyState = (): AppState => ({ profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], revision: 0 });
+export const emptyState = (): AppState => ({ profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], measurements: [], revision: 0 });
+export const poseNames: Record<Pose, string> = { front: 'Fronte', side: 'Lato', back: 'Dietro' };

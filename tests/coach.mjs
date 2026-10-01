@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 const out = path.resolve('.test-build');
 await build({ entryPoints: { engine: 'tests/entry.ts' }, bundle: true, format: 'esm', platform: 'node', outdir: out, outExtension: { '.js': '.mjs' }, logLevel: 'error' });
 const E = await import(pathToFileURL(path.join(out, 'engine.mjs')).href + '?' + Date.now());
-const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split, howTo } = E;
+const { generatePlan, nutrition, progressAfterLog, nextWeek, alternatives, answer, apply, resolveGoal, activityFrom, bodyFat, split, howTo, suggest, rampSets, warmupFor, buildContext, families } = E;
 const evidence = new Set(JSON.parse(fs.readFileSync('lib/evidence.json', 'utf8')).map(p => p.id));
 
 const base = { name: 'Test', age: 28, sex: 'male', weight: 80, height: 178, waist: 88, goal: 'recomp', strengthLevel: 'intermediate', runningLevel: 'new', days: [0, 2, 4], minutes: 60, equipment: 'gym', recentRunMinutes: 0, recentLongest: 0, activity: 'low', diet: 'omnivore', restrictions: '', clinical: false, pain: false, nutritionConsent: true, steps: 5500, cardio: [], mealsPerDay: 4, trainingTime: 'evening', allergens: [] };
@@ -120,10 +120,69 @@ console.log('Progression: volume, deload, new block and steps passed.');
 // 6. Session feedback.
 const p6 = { ...base }, plan6 = generatePlan(p6), sess = plan6.sessions.find(x => x.type === 'strength'), ex = sess.exercises.find(e => e.increment > 0);
 const st6 = { profile: p6, plan: plan6, logs: [], checkins: [], decisions: [], messages: [], revision: 0 };
-const log = { sessionId: sess.id, results: Array.from({ length: ex.sets }, (_, i) => ({ exerciseId: ex.id, set: i + 1, weight: 30, reps: ex.high, rir: ex.rir })), pain: false, rpe: 6, duration: 40 };
+const log = { id: 'l6', type: 'strength', week: 1, date: new Date().toISOString(), sessionId: sess.id, results: Array.from({ length: ex.sets }, (_, i) => ({ exerciseId: ex.id, name: ex.name, set: i + 1, weight: 30, reps: ex.high, rir: ex.rir })), pain: false, rpe: 6, duration: 40 };
+st6.logs.push(log);
 assert(progressAfterLog(st6, log).some(d => d.rule === 'double-progression'));
+assert(ex.load > 30, 'Next load stored on the exercise');
 assert(alternatives(p6, ex).length >= 1);
 console.log('Feedback: double progression passed.');
+
+// 6b. Load suggestions, warm-up, per-muscle adaptation, variety between blocks.
+const E1 = { name: 'Panca piana con bilanciere', low: 5, high: 8, rir: 2, sets: 3, increment: 2.5, load: null, unit: 'reps' };
+const perf = (w, reps, rir = 2) => [{ date: '2026-09-01T10:00:00Z', week: 1, sets: reps.map(r => ({ weight: w, reps: r, rir })) }];
+assert.equal(suggest(E1, []).kind, 'start');
+let sg = suggest(E1, perf(60, [8, 8, 8]));
+assert(sg.kind === 'up' && sg.load === 62.5, 'All sets at the top: +2.5 kg ' + JSON.stringify(sg));
+assert.equal(suggest(E1, perf(60, [8, 8, 8], 4)).load, 65, 'Very easy: bigger jump');
+sg = suggest(E1, perf(60, [7, 6, 6]));
+assert(sg.kind === 'hold' && sg.load === 60 && sg.target === '8 · 7 · 7', 'In range: same load, +1 rep ' + JSON.stringify(sg));
+sg = suggest(E1, perf(60, [4, 3, 3]));
+assert(sg.kind === 'down' && sg.load < 60 && sg.load % 2.5 === 0, 'Below range: lower load ' + JSON.stringify(sg));
+sg = suggest({ ...E1, low: 10, high: 15 }, perf(60, [6, 6, 6]));
+assert(sg.load < 60 && sg.load >= 40, 'Rep range change converts through e1RM ' + JSON.stringify(sg));
+assert.equal(suggest({ ...E1, name: 'Curl con manubri' }, perf(12, [8, 8, 8])).load, 14, 'Dumbbells move by 2 kg');
+assert.equal(suggest({ ...E1, increment: 0 }, [{ date: 'x', week: 1, sets: [{ weight: null, reps: 6, rir: 2 }] }]).kind, 'reps', 'Bodyweight: add reps');
+assert.equal(suggest(E1, perf(60, [8, 8, 8]), { deload: true }).load, 60, 'Deload: same load');
+const ramp = rampSets('Squat con bilanciere', 100, 5);
+assert(ramp.length >= 3 && ramp[0].startsWith('45') && ramp.at(-1).startsWith('90') && rampSets('Squat con bilanciere', 100, 8).length === 3, 'Ramp-up sets ' + ramp);
+assert(rampSets('Leg extension', null, 10).length === 3);
+for (const kind of ['upper', 'lower', 'push', 'pull', 'legs', 'full']) { const w = warmupFor({ kind, title: '' }, base); assert(w.general && w.drills.length >= 4, kind); }
+assert(warmupFor({ kind: 'lower' }, base).drills.some(d => /gambe|Squat/.test(d.name)), 'Lower warm-up targets the legs');
+const allNames = Object.values(families).flatMap(f => f.list.map(e => e.name));
+assert.equal(new Set(allNames).size, allNames.length, 'Exercise names are unique');
+assert(allNames.length >= 120, 'Large exercise library: ' + allNames.length);
+assert(allNames.filter(n => /multipower/i.test(n)).length >= 10, 'Smith machine variants');
+for (const f of Object.values(families)) for (const e of f.list) assert(e.setup && e.steps.length && e.mistakes.length, 'Technique for ' + e.name);
+// Variety: accessories rotate from the second block, main lifts stay.
+{
+  const pm = { ...base, goal: 'muscle', days: [0, 1, 3, 4] };
+  const plan = generatePlan(pm);
+  const st = { profile: pm, plan, logs: [], checkins: [], decisions: [], messages: [], measurements: [], revision: 0 };
+  const first = plan.sessions.flatMap(x => x.exercises.map(e => [e.role, e.name]));
+  for (let w = 0; w < 5; w++) { for (const x of st.plan.sessions) st.logs.push({ id: 'v' + w + x.id, sessionId: x.id, title: x.title, type: x.type, week: st.plan.week, completed: true, pain: false, rpe: 6, plannedRpe: x.targetRpe, duration: x.duration, results: [], note: '', date: new Date(Date.now() + w * 1e3).toISOString(), distance: null }); nextWeek(st); }
+  assert.equal(st.plan.progress.mesoCount, 2, 'Second block');
+  const second = st.plan.sessions.flatMap(x => x.exercises.map(e => [e.role, e.name]));
+  assert.deepEqual(second.filter(x => x[0] === 'main').map(x => x[1]), first.filter(x => x[0] === 'main').map(x => x[1]), 'Main lifts unchanged');
+  assert.notDeepEqual(second.filter(x => x[0] !== 'main').map(x => x[1]), first.filter(x => x[0] !== 'main').map(x => x[1]), 'Accessories rotate');
+}
+// Per-muscle adaptation: the chest lifts drop for a week, the rest improves.
+{
+  const pm = { ...base, days: [0, 2, 4] };
+  const st = { profile: pm, plan: generatePlan(pm), logs: [], checkins: [], decisions: [], messages: [], measurements: [], revision: 0 };
+  let t = Date.parse('2026-09-01T10:00:00Z');
+  const week = (factor) => {
+    for (const x of st.plan.sessions) {
+      const results = x.exercises.flatMap(e => Array.from({ length: e.sets }, (_, i) => ({ exerciseId: e.id, name: e.name, set: i + 1, weight: e.increment ? Math.round(50 * factor(e) * 2) / 2 : null, reps: e.low + 1, rir: e.rir })));
+      st.logs.push({ id: 'm' + t, sessionId: x.id, title: x.title, type: x.type, week: st.plan.week, completed: true, pain: false, rpe: 6, plannedRpe: x.targetRpe, duration: x.duration, results, note: '', date: new Date(t += 864e5).toISOString(), distance: null });
+    }
+    return nextWeek(st);
+  };
+  week(() => 1);
+  const d = week(e => (e.family === 'hpush' || e.family === 'fly' ? 0.9 : 1.04));
+  assert((st.plan.progress.muscleBonus.chest ?? 0) < 0, 'Falling chest performance: fewer chest sets ' + JSON.stringify(st.plan.progress.muscleBonus));
+  assert(/Petto/.test(d.reason) && /Quadricipiti \+/.test(d.reason), 'Weekly review reports trends: ' + d.reason);
+}
+console.log('Coaching: load suggestions, ramp-up sets, warm-ups, exercise library, block variety and per-muscle adaptation passed.');
 
 // 7. Nutrition.
 const act = (p, plan) => activityFrom(p, plan ?? generatePlan(p));
@@ -167,8 +226,20 @@ s = apply(s, { type: 'checkin', data: { sleep: 7, fatigue: 2, soreness: 2, pain:
 s = apply(s, { type: 'week' }); assert.equal(s.plan.week, 2);
 s = apply(s, { type: 'chat', data: 'Devo fare cardio?' }); assert(s.messages.at(-1).text.includes('passi'));
 assert.throws(() => apply(s, { type: 'profile', data: { ...base, name: '' } }), /nome/);
+s = apply(s, { type: 'measure', data: { date: '2026-09-30', weight: 79.2, waist: 86, chest: null, arm: 36, thigh: null, hips: null, note: '', photos: { front: 'k1' } } });
+assert.equal(s.measurements.length, 1); assert.equal(s.profile.waist, 86, 'Latest waist updates the profile'); assert.equal(s.profile.weight, 79.2);
+assert.throws(() => apply(s, { type: 'measure', data: { date: '2026-09-30', weight: null, waist: null, chest: null, arm: null, thigh: null, hips: null, note: '', photos: {} } }), /almeno/);
+assert.throws(() => apply(s, { type: 'measure', data: { date: '2026-09-30', weight: 900, waist: null, chest: null, arm: null, thigh: null, hips: null, note: '', photos: {} } }), /intervallo/);
+s = apply(s, { type: 'message', data: { role: 'user', text: 'Che carico metto?' } });
+s = apply(s, { type: 'message', data: { role: 'assistant', text: 'Oggi 62,5 kg.', mode: 'ai' } });
+assert.equal(s.messages.at(-1).mode, 'ai');
+const ctx = buildContext(s);
+assert(/PROFILO/.test(ctx) && /PIANO/.test(ctx) && /DIARIO/.test(ctx) && /MISURE/.test(ctx) && /vita 86/.test(ctx), 'Chat context: ' + ctx.slice(0, 300));
+assert(/prossimo carico|ultima volta/.test(ctx), 'Context carries load suggestions');
+s = apply(s, { type: 'measureDelete', data: s.measurements[0].id }); assert.equal(s.measurements.length, 0);
+s = apply(s, { type: 'clearChat' }); assert.equal(s.messages.length, 0);
 s = apply(s, { type: 'reset' }); assert.equal(s.profile, null);
-console.log('Store: profile, validation, logging, check-in, week, chat and reset passed.');
+console.log('Store: profile, validation, logging, check-in, week, chat, measurements, coach context and reset passed.');
 
 // 9. Coach answers.
 const cs = { profile: base, plan: generatePlan(base), logs: [], checkins: [], decisions: [], messages: [], revision: 0 };

@@ -55,7 +55,7 @@ export function splitName(templates: Template[]): string {
 const BASE: Record<Profile['goal'], [number, number, number]> = { recomp: [7, 9, 11], muscle: [8, 10, 12], 'fat-loss': [6, 8, 10], strength: [6, 8, 9], balanced: [6, 8, 10], health: [4, 6, 6], running: [4, 5, 6] };
 const CAP: Record<Profile['goal'], [number, number, number]> = { recomp: [10, 14, 16], muscle: [12, 16, 20], 'fat-loss': [10, 12, 14], strength: [9, 12, 14], balanced: [9, 12, 14], health: [6, 8, 8], running: [6, 8, 8] };
 
-export type Context = { deload: boolean; mesoWeek: number; mesoLength: number; setBonus: number; cautious: boolean; moderateOnly: boolean };
+export type Context = { deload: boolean; mesoWeek: number; mesoLength: number; setBonus: number; cautious: boolean; moderateOnly: boolean; block?: number; muscleBonus?: Partial<Record<Muscle, number>> };
 
 export function weeklyTargets(p: Profile, ctx: Context): Record<Muscle, number> {
   const li = levelIndex(p);
@@ -65,6 +65,8 @@ export function weeklyTargets(p: Profile, ctx: Context): Record<Muscle, number> 
     let t = Math.min(CAP[p.goal][li], BASE[p.goal][li] + ctx.setBonus * step);
     if (p.focus === 'upper') t += ['chest', 'back', 'shoulders', 'biceps', 'triceps'].includes(m) ? 2 : -1;
     if (p.focus === 'lower') t += ['quads', 'hamstrings', 'glutes', 'calves'].includes(m) ? 2 : -1;
+    // Per-muscle adjustment decided by the weekly review from performance trends.
+    t = Math.min(CAP[p.goal][li] + 2, t + (ctx.muscleBonus?.[m] ?? 0));
     if (m === 'core') t = Math.min(t, 6);
     if (m === 'calves') t = p.goal === 'running' || p.goal === 'balanced' ? Math.max(4, Math.min(t, 8)) : Math.min(t, 6);
     if (ctx.cautious) t *= 0.8;
@@ -145,7 +147,7 @@ export function buildStrengthWeek(p: Profile, templates: Template[], ctx: Contex
     return slots.flatMap(([fam, role]) => {
       const k = used[fam] = (used[fam] ?? -1) + 1;
       const occurrence = weekly[fam] = (weekly[fam] ?? -1) + 1;
-      const name = variantFor(p, fam, occurrence, role);
+      const name = variantFor(p, fam, occurrence, role, ctx.block ?? 1);
       return name ? [{ si, k, fam, role, name, sets: fam === 'plyo' ? 2 : 0 }] : [];
     });
   });
@@ -195,7 +197,7 @@ export function buildStrengthWeek(p: Profile, templates: Template[], ctx: Contex
       id: '', type: 'strength', kind: t.kind, title: t.title, hard,
       duration: Math.ceil(strengthTime(exs, warm, cool)), exercises: exs,
       phases: [
-        { label: 'Riscaldamento: 3–5 minuti generali, poi serie di avvicinamento sul primo esercizio', minutes: warm, effort: 'Facile, senza affaticarti' },
+        { label: 'Riscaldamento', minutes: warm, effort: 'Cardio leggero, mobilità e serie di avvicinamento' },
         { label: 'Ritorno alla calma e note della seduta', minutes: cool, effort: 'Facile' },
       ],
       targetRpe: ctx.deload ? 5 : p.strengthLevel === 'new' || ctx.cautious || ctx.moderateOnly ? 6 : 7,

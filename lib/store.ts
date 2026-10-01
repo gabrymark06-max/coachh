@@ -1,5 +1,5 @@
 // Client-side state: every action runs the coaching engine in the browser and the result is saved on this device.
-import { emptyState, type AppState, type CheckIn, type Profile, type WorkoutLog } from './types';
+import { emptyState, type AppState, type CheckIn, type Measurement, type Profile, type WorkoutLog } from './types';
 import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal } from './planner';
 import { answer } from './coach';
 
@@ -9,8 +9,10 @@ export function load(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyState();
-    const s = JSON.parse(raw) as AppState;
-    return { ...emptyState(), ...s };
+    const s = { ...emptyState(), ...(JSON.parse(raw) as AppState) };
+    // Older logs stored only the exercise id: attach the name while the plan still matches them.
+    for (const l of s.logs) for (const r of l.results) if (!r.name) { const e = s.plan?.sessions.flatMap(x => x.exercises).find(x => x.id === r.exerciseId); if (e) r.name = e.name; }
+    return s;
   } catch { return emptyState(); }
 }
 
@@ -40,6 +42,10 @@ export type Action =
   | { type: 'checkin'; data: Omit<CheckIn, 'id' | 'date'> }
   | { type: 'week' }
   | { type: 'chat'; data: string }
+  | { type: 'message'; data: { role: 'user' | 'assistant'; text: string; mode?: string } }
+  | { type: 'measure'; data: Omit<Measurement, 'id'> & { id?: string } }
+  | { type: 'measureDelete'; data: string }
+  | { type: 'clearChat' }
   | { type: 'reset' };
 
 /** Apply one action to a copy of the state. Throws an Error with a user-facing message when the action is not allowed. */
@@ -65,7 +71,8 @@ export function apply(prev: AppState, action: Action): AppState {
       const actual = d.results.map(x => `${x.exerciseId}:${x.set}`);
       if (new Set(actual).size !== actual.length || actual.some(x => !expected.includes(x)) || (d.completed !== false && actual.length !== expected.length)) throw Error('Spunta tutte le serie fatte, oppure scegli «Parziale».');
       if (s.logs.some(x => x.sessionId === session.id && x.week === plan.week)) throw Error('Hai già registrato questa seduta questa settimana.');
-      const log: WorkoutLog = { ...d, note: clean(d.note, 1000), id: id(), date: now(), title: session.title, type: session.type, week: plan.week, plannedDuration: session.duration, plannedRpe: session.targetRpe, plannedRunMinutes: session.runMinutes };
+      const names = new Map(session.exercises.map(e => [e.id, e.name]));
+      const log: WorkoutLog = { ...d, results: d.results.map(r => ({ ...r, name: names.get(r.exerciseId) })), note: clean(d.note ?? '', 1000), id: id(), date: now(), title: session.title, type: session.type, week: plan.week, plannedDuration: session.duration, plannedRpe: session.targetRpe, plannedRunMinutes: session.runMinutes };
       s.logs.push(log);
       log.feedback = progressAfterLog(s, log);
       s.decisions.push(...log.feedback);
@@ -100,6 +107,29 @@ export function apply(prev: AppState, action: Action): AppState {
       s.messages = s.messages.slice(-80);
       break;
     }
+    case 'message': {
+      const text = clean(action.data.text, action.data.role === 'user' ? 2000 : 8000);
+      if (!text) throw Error('Scrivi una domanda.');
+      s.messages.push({ id: id(), date: now(), role: action.data.role, text, sources: [], mode: action.data.mode });
+      s.messages = s.messages.slice(-80);
+      break;
+    }
+    case 'clearChat': s.messages = []; break;
+    case 'measure': {
+      const d = action.data;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw Error('Data non valida.');
+      const opt = (x: number | null, min: number, max: number) => (x === null || x === undefined || Number.isNaN(x) ? null : num(x, min, max));
+      const m: Measurement = {
+        id: d.id ?? id(), date: d.date, weight: opt(d.weight, 35, 250), waist: opt(d.waist, 40, 200), chest: opt(d.chest, 50, 200),
+        arm: opt(d.arm, 15, 70), thigh: opt(d.thigh, 30, 100), hips: opt(d.hips, 50, 200), note: clean(d.note, 500), photos: d.photos ?? {},
+      };
+      if (![m.weight, m.waist, m.chest, m.arm, m.thigh, m.hips].some(x => x !== null) && !Object.keys(m.photos).length) throw Error('Inserisci almeno una misura o una foto.');
+      s.measurements = [...(s.measurements ?? []).filter(x => x.id !== m.id), m].sort((a, b) => a.date.localeCompare(b.date));
+      // The latest measurement keeps the profile current, so calories and body-fat estimates follow the real body.
+      if (s.profile && m.id === s.measurements.at(-1)?.id) s.profile = { ...s.profile, ...(m.waist ? { waist: m.waist } : {}), ...(m.weight ? { weight: m.weight } : {}) };
+      break;
+    }
+    case 'measureDelete': s.measurements = (s.measurements ?? []).filter(x => x.id !== action.data); break;
     case 'reset': return { ...emptyState(), revision: prev.revision + 1 };
   }
   s.decisions = s.decisions.slice(-200);
