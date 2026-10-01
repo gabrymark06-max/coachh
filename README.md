@@ -34,7 +34,7 @@ La chat chiama `POST /api/coach`, che inoltra la domanda a Gemini lato server: l
 
 Variabili facoltative:
 
-- `GEMINI_MODEL`: modello da usare. Il predefinito è `gemini-flash-latest`, l'ultimo modello Flash.
+- `GEMINI_MODEL`: modello da usare. Il predefinito è `gemini-3.8-flash`; se è sovraccarico la chat passa da sola a `gemini-flash-latest`, `gemini-3.5-flash` e `gemini-3.5-flash-lite`.
 
 Senza chiave la chat risponde con le regole locali e lo segnala sotto ogni risposta.
 
