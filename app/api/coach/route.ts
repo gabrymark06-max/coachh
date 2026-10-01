@@ -64,6 +64,8 @@ export async function POST(req: Request) {
       if (res.status === 400 && thinking) continue; // model without thinking levels: retry plainly
       if (res.status === 404) break; // unknown model: try the next one
       const data = await res.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[]; error?: { message?: string } } | null;
+      // No credit or a disabled key: answer like an unconfigured coach, so the app falls back to its local rules.
+      if (res.status === 402 || res.status === 401 || res.status === 403) return Response.json({ error: 'not-configured', detail: data?.error?.message }, { status: 503 });
       if (!res.ok) return Response.json({ error: res.status === 429 ? 'Limite di richieste raggiunto per oggi: riprova più tardi.' : 'Il coach non ha risposto. Riprova.', detail: data?.error?.message }, { status: 502 });
       const text = (data?.candidates?.[0]?.content?.parts ?? []).filter(p => !p.thought && p.text).map(p => p.text).join('').trim();
       if (!text) return Response.json({ error: 'Risposta vuota: riformula la domanda.' }, { status: 502 });
