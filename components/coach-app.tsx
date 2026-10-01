@@ -259,7 +259,8 @@ function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s: Sessi
         <button className="primary" onClick={onNext} style={{ marginTop: 8 }}>Chiudi la settimana e aggiorna</button>
       </section>
       {bp && <section className="stack">
-        <div className="panel dark"><div className="eyebrow">Il blocco · {bp.meso.label}</div><TemperCurve meso={bp.meso} /></div>
+        <div className="sectionheading"><h2>Il blocco</h2><small>{bp.meso.label} · settimana {bp.meso.week} di {bp.meso.length}</small></div>
+        <div className="panel dark"><TemperCurve meso={bp.meso} /></div>
         <div className="panel"><h2>Serie a settimana per muscolo</h2>
           <div className="musclebars">{Object.entries(bp.muscleSets).filter(([, v]) => v > 0).map(([m, v]) => <div className="musclebar" key={m}><span>{muscleNames[m as keyof typeof muscleNames]}</span><span className="track"><span style={{ width: `${(v / max) * 100}%` }} /></span><strong>{v}</strong></div>)}</div>
         </div>
