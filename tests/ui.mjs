@@ -108,6 +108,11 @@ try {
     await tab('Oggi');
     await click('Inizia l’allenamento'); await sleep(600);
     assert.ok(await ev(`document.querySelectorAll('.setrow').length > 3`), 'set rows');
+    await ev(`document.querySelector('.swapbtn').click()`); await sleep(300);
+    await shot('4b-swap');
+    const swapTo = await ev(`document.querySelector('.swaplist button').textContent`);
+    await ev(`document.querySelector('.swaplist button').click()`); await sleep(500);
+    assert.ok(await ev(`[...document.querySelectorAll('.exercise h3')].some(h => h.textContent === ${JSON.stringify(swapTo)})`), 'exercise swapped from the header button');
     await shot('4-workout');
   });
 
@@ -125,6 +130,7 @@ try {
     assert.ok(await waitFor(`document.querySelectorAll('.xrow').length > 0`), 'library loaded');
     await type('.xpicker input', 'multipower squat');
     assert.ok(await waitFor(`[...document.querySelectorAll('.xrow b')].some(b => /multipower/i.test(b.textContent))`), 'search by Italian name');
+    await shot('5p-picker');
     await ev(`document.querySelector('.xrow .xmain').click()`); await sleep(400);
     await ev(`document.querySelector('.bex.editing')?.scrollIntoView({ block: 'center' })`);
     await shot('5-builder');

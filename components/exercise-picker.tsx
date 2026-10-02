@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- exercise photos come from the free-exercise-db repository */
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Trash2, ChevronLeft } from 'lucide-react';
+import { Search, Plus, Trash2, ChevronLeft, Info } from 'lucide-react';
 import type { CatalogEntry } from '../lib/types';
 import { loadCatalog, searchCatalog, equipmentList, groupNames, IMG } from '../lib/catalog';
 
@@ -28,10 +28,11 @@ export function ExercisePicker({ custom, pick, create, remove }: { custom: Catal
     {list && <p className="pickerlabel">{found.length === 60 ? 'Primi 60 risultati' : `${found.length} esercizi`}</p>}
     {found.map(e => <div className={'xrow' + (open === e.id ? ' open' : '')} key={e.id}>
       <button type="button" className="xmain" onClick={() => pick(e)}>
-        <span className="grow"><b>{e.n}</b><small>{[e.eq, ...e.g.map(g => groupNames[g]?.toLowerCase())].filter(Boolean).join(' · ')}{e.src === 'custom' ? ' · tuo' : ''}</small></span><Plus size={18} />
+        <span className="grow"><b>{e.n}</b><small>{[e.eq, ...e.g.map(g => groupNames[g]?.toLowerCase())].filter(Boolean).join(' · ')}{e.src === 'custom' ? ' · tuo' : ''}</small></span>
       </button>
-      {(e.s.length > 0 || e.img?.length) && <button type="button" className="ghost xinfo" onClick={() => setOpen(open === e.id ? null : e.id)}>{open === e.id ? 'Chiudi' : 'Come si fa'}</button>}
       {e.src === 'custom' && <button type="button" className="iconbtn small" aria-label={`Elimina ${e.n}`} onClick={() => { if (confirm(`Eliminare l’esercizio «${e.n}»?`)) remove(e.id); }}><Trash2 size={15} /></button>}
+      {(e.s.length > 0 || e.img?.length) && <button type="button" className={'iconbtn small xinfo' + (open === e.id ? ' on' : '')} aria-label={`Come si fa: ${e.n}`} aria-expanded={open === e.id} onClick={() => setOpen(open === e.id ? null : e.id)}><Info size={17} /></button>}
+      <button type="button" className="xadd" aria-label={`Aggiungi ${e.n}`} onClick={() => pick(e)}><Plus size={20} /></button>
       {open === e.id && <Technique e={e} />}
     </div>)}
   </div>;
