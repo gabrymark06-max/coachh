@@ -124,6 +124,11 @@ try {
     await shot('5-builder', true);
     await click('Salva il mio piano'); await sleep(600);
     assert.ok(await has('Il tuo piano · settimana'), 'own plan active');
+    await click('Piano del coach', '.planswitch button');
+    assert.ok(await has('Blocco ') && !(await has('Il tuo piano · settimana')), 'switched to the coach plan');
+    await click('Il mio piano', '.planswitch button');
+    assert.ok(await has('Il tuo piano · settimana'), 'switched back to the own plan');
+    await shot('5b-plan');
   });
 
   await step('own diet targets', async () => {

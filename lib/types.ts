@@ -98,6 +98,8 @@ export type MeasuredTdee = { kcal: number; date: string; days: number; intake: n
 export type AppState = {
   profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number;
   meals?: SavedMeal[]; tdee?: MeasuredTdee | null;
+  /** The plan not in use (coach's or own), kept so the person can switch back and forth. */
+  savedPlan?: Plan | null;
   customExercises?: CatalogEntry[]; diet?: DietTargets | null; myDay?: { training: MyMeal[]; rest: MyMeal[] } | null;
   /** When this copy last changed, and ids removed on purpose: two devices' copies are merged with these. */
   updatedAt?: string; deleted?: Record<string, string>;

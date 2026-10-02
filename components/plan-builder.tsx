@@ -12,6 +12,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 /** The person's own plan: days, exercises and sets. Starts from the current plan, so the coach's one can be edited too. */
 export function PlanBuilder({ plan, custom, act, done }: { plan: Plan | null; custom: CatalogEntry[]; act: (a: Action) => boolean; done: () => void }) {
+  // Edits the own plan when there is one (in use or kept aside), otherwise starts from the coach's plan.
   const [days, setDays] = useState<Day[]>(() => (plan?.sessions ?? []).filter(s => s.type === 'strength').map(s => ({ id: plan?.custom ? s.id : undefined, title: s.title, day: s.day, exercises: s.exercises.map(e => ({ ...e })) })));
   const [picking, setPicking] = useState<number | null>(null);
   const setDay = (i: number, patch: Partial<Day>) => setDays(d => d.map((x, j) => j === i ? { ...x, ...patch } : x));

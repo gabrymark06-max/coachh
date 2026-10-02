@@ -740,3 +740,4 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 .myitem .grow { display: flex; flex-direction: column; min-width: 0; }
 .myitem small { color: var(--muted); font-size: 12px; }
 .myadd { display: flex; flex-direction: column; gap: 6px; }
+.planswitch { margin: -8px 0 20px; max-width: 420px; }

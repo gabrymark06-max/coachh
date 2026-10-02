@@ -319,8 +319,17 @@ s = apply(s, { type: 'reset' }); assert.equal(s.profile, null);
   st = apply(st, { type: 'myDay', data: { training: [{ name: 'Pranzo', items: [{ food: 'Riso basmati (crudo)', grams: 100 }, { food: 'Inventato', grams: 50 }] }], rest: [{ name: 'Cena', items: [{ food: 'Merluzzo (crudo)', grams: 200 }] }] } });
   assert.equal(st.myDay.training[0].items.length, 1, 'unknown foods dropped');
   assert.equal(E.nutritionFor(st).meals.training[0].kcal, 355);
+  const coachId = st.savedPlan.id;
   st = apply(st, { type: 'coachPlan' });
-  assert.ok(!st.plan.custom && st.plan.sessions.length > 0, 'back to the coach plan');
+  assert.ok(!st.plan.custom && st.plan.id === coachId, 'back to the same coach plan');
+  assert.ok(st.savedPlan.custom && st.savedPlan.week === 2, 'own plan kept aside');
+  st = apply(st, { type: 'profile', data: { ...st.profile, minutes: 45 } });
+  assert.ok(!st.plan.custom && st.savedPlan.custom, 'new answers rebuild the coach plan, own plan kept');
+  st = apply(st, { type: 'ownPlan' });
+  assert.ok(st.plan.custom && st.plan.week === 2 && st.plan.sessions[0].exercises[0].load === 42.5, 'switch back to own plan with week and loads');
+  st = apply(st, { type: 'profile', data: { ...st.profile, minutes: 60 } });
+  assert.ok(st.plan.custom && !st.savedPlan.custom, 'answers changed while on own plan: own plan stays in use');
+  assert.throws(() => apply({ ...st, plan: st.savedPlan, savedPlan: null }, { type: 'ownPlan' }), /Crea prima/);
 }
 console.log('Store: profile, validation, logging, check-in, week, chat, measurements, food diary, coach context and reset passed.');
 

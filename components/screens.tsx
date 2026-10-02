@@ -39,14 +39,18 @@ export function Reveal({ p, plan, n, close }: { p: Profile; plan: Plan; n: Nutri
   </section>;
 }
 
-export function Programme({ plan, card, onEdit, onBuild, onCoach, onNext }: { plan: Plan; card: (s: Session) => ReactNode; onEdit: () => void; onBuild: () => void; onCoach: () => void; onNext: () => void }) {
+export function Programme({ plan, hasOwn, card, onEdit, onBuild, onSwitch, onNext }: { plan: Plan; hasOwn: boolean; card: (s: Session) => ReactNode; onEdit: () => void; onBuild: () => void; onSwitch: (own: boolean) => void; onNext: () => void }) {
   const bp = plan.blueprint;
   const max = bp ? Math.max(...Object.values(bp.muscleSets), 1) : 1;
   return <>
     <Heading label={plan.custom ? `Il tuo piano · settimana ${plan.week}` : `Blocco ${plan.progress?.mesoCount ?? 1} · settimana ${plan.week}`} title="Il tuo allenamento." description={plan.custom ? 'Esercizi, serie e giorni scelti da te. Il coach ti suggerisce i carichi.' : bp?.summary ?? ''}>
-      <button className="primary" onClick={onBuild}>{plan.custom ? 'Modifica il mio piano' : 'Crea il tuo piano'}</button>
-      {plan.custom ? <button className="secondary" onClick={onCoach}>Piano del coach</button> : <button className="secondary" onClick={onEdit}>Modifica risposte</button>}
+      <button className="primary" onClick={onBuild}>{hasOwn ? 'Modifica il mio piano' : 'Crea il tuo piano'}</button>
+      {!plan.custom && <button className="secondary" onClick={onEdit}>Modifica risposte</button>}
     </Heading>
+    <div className="segmented full planswitch" role="group" aria-label="Piano in uso">
+      <button aria-pressed={!plan.custom} onClick={() => onSwitch(false)}>Piano del coach</button>
+      <button aria-pressed={!!plan.custom} onClick={() => hasOwn ? onSwitch(true) : onBuild()}>Il mio piano</button>
+    </div>
     {bp && !plan.custom && <div className="metrics">{bp.weekly.map(w => <Metric key={w.label} label={w.label} value={w.value} />)}</div>}
     <div className="grid2">
       <section>

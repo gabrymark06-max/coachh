@@ -61,6 +61,7 @@ export type Action =
   | { type: 'customExerciseDelete'; data: string }
   | { type: 'customPlan'; data: { id?: string; title: string; day: number; exercises: Exercise[] }[] }
   | { type: 'coachPlan' }
+  | { type: 'ownPlan' }
   | { type: 'diet'; data: DietTargets | null }
   | { type: 'myDay'; data: { training: MyMeal[]; rest: MyMeal[] } | null }
   | { type: 'reset' };
@@ -72,6 +73,8 @@ export function apply(prev: AppState, action: Action): AppState {
     case 'profile': {
       const p = resolveGoal(validProfile(action.data));
       s.profile = p;
+      // With the own plan in use, new answers update the coach's plan kept aside; the own plan stays as it is.
+      if (s.plan?.custom) { s.savedPlan = generatePlan(p, s.savedPlan ?? null); break; }
       s.plan = generatePlan(p, s.plan);
       s.decisions.push({ id: id(), date: now(), title: s.plan.blocked ? 'Piano in attesa di valutazione' : 'Nuovo piano costruito', reason: s.plan.blocked ? s.plan.notes.join(' ') : (s.plan.blueprint?.summary ?? '') + ' I carichi si calibrano nella prima settimana.', sources: [], rule: 'initial-plan' });
       break;
@@ -177,14 +180,22 @@ export function apply(prev: AppState, action: Action): AppState {
     case 'customExerciseDelete': s.customExercises = (s.customExercises ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
     case 'customPlan': {
       if (!s.profile) throw Error('Prima compila il profilo.');
-      s.plan = customPlan(action.data, s.plan);
+      // The coach's plan is kept aside, ready to switch back to; an own plan kept aside is the one being edited.
+      const own = s.plan?.custom ? s.plan : s.savedPlan?.custom ? s.savedPlan : null;
+      if (s.plan && !s.plan.custom) s.savedPlan = s.plan;
+      s.plan = customPlan(action.data, own ?? s.plan);
       s.decisions.push({ id: id(), date: now(), title: 'Piano tuo', reason: `${s.plan.sessions.length} sedute a settimana scelte da te. Non cambio esercizi, serie e giorni: ti suggerisco il carico di ogni esercizio dalla volta prima e il riscaldamento.`, sources: cite('progression', 'autoregulation'), rule: 'custom-plan' });
       break;
     }
-    case 'coachPlan': {
+    case 'coachPlan': case 'ownPlan': {
       if (!s.profile) throw Error('Prima compila il profilo.');
-      s.plan = generatePlan(s.profile);
-      s.decisions.push({ id: id(), date: now(), title: 'Piano del coach', reason: s.plan.blueprint?.summary ?? '', sources: [], rule: 'initial-plan' });
+      const wantOwn = action.type === 'ownPlan';
+      if (!!s.plan?.custom === wantOwn) break;
+      const other = s.savedPlan && !!s.savedPlan.custom === wantOwn ? s.savedPlan : null;
+      if (wantOwn && !other) throw Error('Crea prima il tuo piano.');
+      s.savedPlan = s.plan;
+      s.plan = other ?? generatePlan(s.profile);
+      s.decisions.push({ id: id(), date: now(), title: wantOwn ? 'Torni al tuo piano' : 'Torni al piano del coach', reason: wantOwn ? 'Esercizi, serie e giorni scelti da te; il piano del coach resta salvato.' : 'Il tuo piano resta salvato: puoi tornarci quando vuoi.', sources: [], rule: 'switch-plan' });
       break;
     }
     case 'diet': {
