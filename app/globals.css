@@ -12,7 +12,8 @@
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
   --radius: 18px; --gap: 16px; --shadow: 0 1px 2px #1b21280d, 0 8px 24px -12px #1b212826;
   --safe-b: env(safe-area-inset-bottom, 0px);
-  --safe-t: env(safe-area-inset-top, 0px);
+  /* Extra room below the iPhone status bar in the installed app (0 in the browser, where the inset is 0). */
+  --safe-t: calc(env(safe-area-inset-top, 0px) + min(env(safe-area-inset-top, 0px), 14px));
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
