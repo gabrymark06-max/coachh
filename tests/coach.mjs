@@ -293,6 +293,35 @@ s = apply(s, { type: 'reset' }); assert.equal(s.profile, null);
   const b = E.blendTdee(2500, m, t0);
   assert.ok(b.measured && b.tdee > 2500 && b.tdee <= 2500 * 1.25, 'Blend stays within the equation bounds');
 }
+// Own plan, own exercises and own diet: the coach keeps the structure and only suggests loads.
+{
+  let st = apply({ profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], measurements: [], foods: [], revision: 0 }, { type: 'profile', data: { ...base, days: [0, 2, 4] } });
+  st = apply(st, { type: 'customExercise', data: { id: 'c-1', n: 'Chest press convergente', eq: 'macchina', g: ['chest', 'triceps'] } });
+  assert.equal(st.customExercises.length, 1);
+  const ex = (id, name, extra = {}) => ({ id, name, family: 'custom', sets: 3, low: 8, high: 12, rir: 2, rest: 90, load: null, increment: 2.5, cue: '', muscles: ['chest'], unit: 'reps', ...extra });
+  st = apply(st, { type: 'customPlan', data: [{ title: 'Petto', day: 1, exercises: [ex('a', 'Chest press convergente', { catalogId: 'c-1' }), ex('b', 'Croci ai cavi')] }, { title: 'Gambe', day: 3, exercises: [ex('c', 'Squat al multipower', { muscles: ['quads'] })] }] });
+  assert.ok(st.plan.custom); assert.equal(st.plan.sessions.length, 2); assert.equal(st.plan.sessions[0].kind, 'upper'); assert.equal(st.plan.sessions[1].kind, 'lower');
+  assert.ok(st.plan.sessions[0].duration > 10, 'duration estimated');
+  assert.throws(() => apply(st, { type: 'customPlan', data: [{ title: 'A', day: 1, exercises: [] }] }), /esercizio/);
+  assert.throws(() => apply(st, { type: 'customPlan', data: [{ title: 'A', day: 1, exercises: [ex('x', 'X')] }, { title: 'B', day: 1, exercises: [ex('y', 'Y')] }] }), /giorno/);
+  const sid = st.plan.sessions[0].id, exs = st.plan.sessions[0].exercises;
+  st = apply(st, { type: 'log', data: { sessionId: sid, duration: 50, rpe: 7, pain: false, distance: null, note: '', results: exs.flatMap(e => [1, 2, 3].map(set => ({ exerciseId: e.id, set, weight: 40, reps: 12, rir: 2 }))) } });
+  assert.equal(st.plan.sessions[0].exercises[0].load, 42.5, 'load suggested after a full set range');
+  const before = JSON.stringify(st.plan.sessions.map(x => x.exercises.map(e => [e.name, e.sets, e.low, e.high])));
+  st = apply(st, { type: 'week' });
+  assert.equal(st.plan.week, 2); assert.equal(JSON.stringify(st.plan.sessions.map(x => x.exercises.map(e => [e.name, e.sets, e.low, e.high]))), before, 'own plan structure untouched');
+  st = apply(st, { type: 'customPlan', data: st.plan.sessions.map(x => ({ id: x.id, title: x.title, day: x.day, exercises: x.exercises })) });
+  assert.equal(st.plan.week, 2, 'editing keeps the week'); assert.equal(st.plan.sessions[0].exercises[0].load, 42.5, 'editing keeps loads');
+  st = apply(st, { type: 'diet', data: { training: { kcal: 0, protein: 180, carbs: 300, fat: 70 }, rest: { kcal: 0, protein: 180, carbs: 200, fat: 70 } } });
+  const n = E.nutritionFor(st);
+  assert.equal(n.training.kcal, 180 * 4 + 300 * 4 + 70 * 9); assert.ok(n.customTargets);
+  assert.throws(() => apply(st, { type: 'diet', data: { training: { kcal: 0, protein: 10, carbs: 10, fat: 5 }, rest: { kcal: 0, protein: 10, carbs: 10, fat: 5 } } }), /1000/);
+  st = apply(st, { type: 'myDay', data: { training: [{ name: 'Pranzo', items: [{ food: 'Riso basmati (crudo)', grams: 100 }, { food: 'Inventato', grams: 50 }] }], rest: [{ name: 'Cena', items: [{ food: 'Merluzzo (crudo)', grams: 200 }] }] } });
+  assert.equal(st.myDay.training[0].items.length, 1, 'unknown foods dropped');
+  assert.equal(E.nutritionFor(st).meals.training[0].kcal, 355);
+  st = apply(st, { type: 'coachPlan' });
+  assert.ok(!st.plan.custom && st.plan.sessions.length > 0, 'back to the coach plan');
+}
 console.log('Store: profile, validation, logging, check-in, week, chat, measurements, food diary, coach context and reset passed.');
 
 // 9. Coach answers.

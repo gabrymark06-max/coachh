@@ -17,6 +17,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; })));
     return;
   }
+  // Exercise library: fresh when online, the saved copy when offline.
+  if (url.pathname === '/catalog.json') {
+    e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res; }).catch(() => caches.match(req)));
+    return;
+  }
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('/', copy)); return res; }).catch(() => caches.match('/').then(hit => hit || Response.error())));
   }

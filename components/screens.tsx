@@ -39,21 +39,22 @@ export function Reveal({ p, plan, n, close }: { p: Profile; plan: Plan; n: Nutri
   </section>;
 }
 
-export function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s: Session) => ReactNode; onEdit: () => void; onNext: () => void }) {
+export function Programme({ plan, card, onEdit, onBuild, onCoach, onNext }: { plan: Plan; card: (s: Session) => ReactNode; onEdit: () => void; onBuild: () => void; onCoach: () => void; onNext: () => void }) {
   const bp = plan.blueprint;
   const max = bp ? Math.max(...Object.values(bp.muscleSets), 1) : 1;
   return <>
-    <Heading label={`Blocco ${plan.progress?.mesoCount ?? 1} · settimana ${plan.week}`} title="Il tuo allenamento." description={bp?.summary ?? ''}>
-      <button className="secondary" onClick={onEdit}>Modifica risposte</button>
+    <Heading label={plan.custom ? `Il tuo piano · settimana ${plan.week}` : `Blocco ${plan.progress?.mesoCount ?? 1} · settimana ${plan.week}`} title="Il tuo allenamento." description={plan.custom ? 'Esercizi, serie e giorni scelti da te. Il coach ti suggerisce i carichi.' : bp?.summary ?? ''}>
+      <button className="primary" onClick={onBuild}>{plan.custom ? 'Modifica il mio piano' : 'Crea il tuo piano'}</button>
+      {plan.custom ? <button className="secondary" onClick={onCoach}>Piano del coach</button> : <button className="secondary" onClick={onEdit}>Modifica risposte</button>}
     </Heading>
-    {bp && <div className="metrics">{bp.weekly.map(w => <Metric key={w.label} label={w.label} value={w.value} />)}</div>}
+    {bp && !plan.custom && <div className="metrics">{bp.weekly.map(w => <Metric key={w.label} label={w.label} value={w.value} />)}</div>}
     <div className="grid2">
       <section>
         <div className="sectionheading"><h2>Questa settimana</h2><small>{plan.sessions.length} allenamenti</small></div>
         {plan.sessions.map(card)}
         <button className="primary" onClick={onNext} style={{ marginTop: 8 }}>Chiudi la settimana e aggiorna</button>
       </section>
-      {bp && <section className="stack">
+      {bp && !plan.custom && <section className="stack">
         <div className="sectionheading"><h2>Il blocco</h2><small>{bp.meso.label} · settimana {bp.meso.week} di {bp.meso.length}</small></div>
         <div className="panel dark"><TemperCurve meso={bp.meso} /></div>
         <div className="panel"><h2>Serie a settimana per muscolo</h2>
@@ -67,11 +68,12 @@ export function Programme({ plan, card, onEdit, onNext }: { plan: Plan; card: (s
   </>;
 }
 
-export function Diet({ n, dayKind, setDayKind, edit, diary }: { n: NutritionPlan; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void; diary: ReactNode }) {
+export function Diet({ n, dayKind, setDayKind, edit, personalise, diary }: { n: NutritionPlan & { customTargets?: boolean; customDay?: boolean }; dayKind: 'training' | 'rest'; setDayKind: (k: 'training' | 'rest') => void; edit: () => void; personalise: () => void; diary: ReactNode }) {
   if (n.blocked) return <><Heading label="Dieta" title="Alimentazione." description="" /><section className="panel notice"><h2>Piano alimentare non attivo</h2><p>{n.reason}</p><button className="primary" onClick={edit}>Modifica risposte</button></section></>;
   const meals = n.meals ? (dayKind === 'training' ? n.meals.training : n.meals.rest) : [];
   return <>
-    <Heading label="Dieta" title={`Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.weeklyChange ?? ''}>
+    <Heading label="Dieta" title={n.customTargets ? 'La tua dieta.' : `Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.customTargets ? 'Calorie e macro scelte da te.' : n.weeklyChange ?? ''}>
+      <button className="primary" onClick={personalise}>Personalizza</button>
       <button className="secondary" onClick={edit}>Modifica risposte</button>
     </Heading>
     {diary}

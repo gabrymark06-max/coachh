@@ -283,6 +283,14 @@ export function nextWeek(state: AppState): Decision {
   const logs = state.logs.filter(x => x.week === plan.week && plan.sessions.some(y => y.id === x.sessionId));
   if (!logs.length) throw Error('Nessuna seduta registrata: ripeti la settimana prima di andare avanti.');
   if (logs.some(x => x.pain) || state.checkins.slice(-3).some(x => x.pain && x.date >= plan.createdAt)) throw Error('Dolore segnalato: prima di proseguire serve una valutazione.');
+  // The person's own plan: same exercises, sets and days; loads already follow each logged session.
+  if (plan.custom) {
+    const done = new Set(logs.map(x => x.sessionId)).size;
+    state.plan = { ...plan, week: plan.week + 1, version: plan.version + 1 };
+    const review = nutritionReview(state);
+    if (review) state.decisions.push(review);
+    return { id: id(), date: now(), title: `Settimana ${plan.week + 1}`, reason: `${done} di ${plan.sessions.length} sedute fatte. Il tuo piano resta uguale: per ogni esercizio trovi il carico consigliato dalla volta prima.`, sources: cite('progression', 'autoregulation'), rule: 'custom-week' };
+  }
   const checkins = state.checkins.filter(x => x.date >= plan.createdAt).slice(-3);
   const reduce = checkins.length >= 2 && checkins.filter(x => x.fatigue >= 4).length >= 2;
   const shortSleep = checkins.length >= 2 && checkins.reduce((t, x) => t + x.sleep, 0) / checkins.length < 6;

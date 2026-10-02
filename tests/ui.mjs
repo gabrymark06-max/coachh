@@ -111,6 +111,29 @@ try {
     await shot('4-workout');
   });
 
+  await step('own plan from the exercise library', async () => {
+    await ev(`document.querySelector('[aria-label="Chiudi"]')?.click()`); await sleep(300);
+    await tab('Allenamento');
+    await click('Crea il tuo piano');
+    assert.ok(await ev(`document.querySelectorAll('.bday').length > 0`), 'builder starts from the current plan');
+    await click('Aggiungi esercizio');
+    assert.ok(await waitFor(`document.querySelectorAll('.xrow').length > 0`), 'library loaded');
+    await type('.xpicker input', 'multipower squat');
+    assert.ok(await waitFor(`[...document.querySelectorAll('.xrow b')].some(b => /multipower/i.test(b.textContent))`), 'search by Italian name');
+    await ev(`document.querySelector('.xrow .xmain').click()`); await sleep(400);
+    await shot('5-builder', true);
+    await click('Salva il mio piano'); await sleep(600);
+    assert.ok(await has('Il tuo piano · settimana'), 'own plan active');
+  });
+
+  await step('own diet targets', async () => {
+    await tab('Dieta');
+    await click('Personalizza');
+    await click('Salva'); await sleep(500);
+    assert.ok(await has('La tua dieta.'), 'own targets active');
+    await shot('6-diet', true);
+  });
+
   assert.deepEqual(errors.filter(e => !/Failed to load resource|favicon|404/.test(e)), [], 'no console errors');
   console.log(`UI test passed. Screenshots in ${OUT}`);
 } finally {

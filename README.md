@@ -6,6 +6,8 @@ Tempra ti fa un questionario e costruisce un piano completo per **dimagrire, far
   - serie per muscolo e split in base ai giorni;
   - oltre 130 esercizi con la tecnica: pesi liberi, multipower, macchine, cavi, corpo libero;
   - blocchi di 4–5 settimane con scarico; dal secondo blocco gli esercizi accessori cambiano, quelli principali restano per confrontare i progressi.
+- **Il tuo piano, se preferisci:** scegli tu giorni, esercizi, serie, ripetizioni, RIR e recupero, partendo da zero o dal piano del coach. Il coach non cambia la struttura: suggerisce il carico di ogni esercizio dalla volta prima e il riscaldamento. Si torna al piano del coach con un tocco.
+- **Libreria di circa 1.000 esercizi** in italiano, con muscoli, attrezzo, istruzioni e foto: i 132 di Tempra più [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense), tradotto con `scripts/build-catalog.mjs` in `public/catalog.json`. Si possono creare esercizi propri.
 - **Riscaldamento specifico per ogni seduta:** cardio leggero, esercizi di mobilità per le articolazioni del giorno e serie di avvicinamento calcolate sul carico di lavoro.
 - **Carico consigliato per ogni esercizio**, calcolato su quello che hai fatto l'ultima volta (doppia progressione regolata dal RIR):
   - completi il range → sale il peso;
@@ -19,7 +21,7 @@ Tempra ti fa un questionario e costruisce un piano completo per **dimagrire, far
   - grasso stimato;
   - forza stimata per esercizio, con il record personale (carico, ripetizioni, data);
   - foto (fronte, lato, dietro) con confronto prima/dopo, affiancato o a scorrimento.
-- **Dieta:** fase, calorie, macronutrienti e giornata tipo calibrata sugli obiettivi.
+- **Dieta:** fase, calorie, macronutrienti e giornata tipo calibrata sugli obiettivi. Con «Personalizza» imposti tu calorie e macro (allenamento e riposo) e componi la tua giornata tipo.
 - **Mantenimento misurato:** con almeno 10 giorni registrati (due pasti o più) e 4 pesate in 4 settimane, il mantenimento si ricalcola dalle calorie mangiate e dall'andamento del peso, ogni due settimane, e sostituisce in gran parte la stima della formula.
 - **Diario alimentare:**
   - codice a barre con la fotocamera: prodotti aggiunti dagli utenti, poi Open Food Facts; se manca, si fotografa l'etichetta e il prodotto resta salvato per tutti (`supabase/products.sql`);

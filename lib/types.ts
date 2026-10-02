@@ -30,6 +30,8 @@ export type Profile = {
 export type Exercise = {
   id: string; name: string; family: string; sets: number; low: number; high: number; rir: number; rest: number;
   load: number | null; increment: number; cue: string; muscles?: string[]; unit?: 'reps' | 'seconds'; role?: 'main' | 'secondary' | 'accessory';
+  /** Exercise from the catalog or created by the person: technique and photos come from there. */
+  catalogId?: string;
 };
 export type RunKind = 'runwalk' | 'easy' | 'long' | 'tempo' | 'intervals' | 'hills' | 'strides' | 'race-pace';
 export type Session = {
@@ -60,6 +62,8 @@ export type Progress = {
 export type Plan = {
   id: string; createdAt: string; version: number; week: number; sessions: Session[]; notes: string[]; blocked: boolean;
   engineVersion?: number; blueprint?: Blueprint; progress?: Progress;
+  /** Built by the person: the coach suggests loads and warm-ups but never changes exercises, sets or days. */
+  custom?: boolean;
 };
 export type SetResult = { exerciseId: string; set: number; weight: number | null; reps: number; rir: number | null; name?: string };
 export type WorkoutLog = { id: string; sessionId: string; title: string; type: 'strength' | 'run'; date: string; duration: number; rpe: number; pain: boolean; distance: number | null; results: SetResult[]; note: string; week: number; completed?: boolean; enjoyment?: number | null; confidence?: number | null; barrier?: 'none' | 'time' | 'fatigue' | 'boredom'; actualRunMinutes?: number | null; readiness?: number; plannedDuration?: number; plannedRpe?: number; plannedRunMinutes?: number; feedback?: Decision[] };
@@ -78,6 +82,15 @@ export type FoodEntry = {
   id: string; date: string; meal: MealSlot; name: string; brand?: string; grams: number;
   kcal: number; p: number; c: number; f: number; code?: string; source: 'barcode' | 'search' | 'generic' | 'photo' | 'label' | 'manual' | 'recent';
 };
+/** One exercise of the library (public/catalog.json) or created by the person. g = coaching muscle groups. */
+export type CatalogEntry = {
+  id: string; n: string; en?: string; eq: string; mu: string[]; g: string[]; c: string; l: number; s: string[];
+  img?: string[]; unit?: 'reps' | 'seconds'; fam?: string; src?: 'tempra' | 'custom';
+};
+/** Daily targets chosen by the person instead of the coach's. */
+export type DietTargets = { training: { kcal: number; protein: number; carbs: number; fat: number }; rest: { kcal: number; protein: number; carbs: number; fat: number } };
+/** The person's own sample day: meals with foods (from the food table) and grams. */
+export type MyMeal = { name: string; items: { food: string; grams: number }[] };
 /** A meal saved to log again with one tap: foods with their grams. */
 export type SavedMeal = { id: string; name: string; items: Omit<FoodEntry, 'id' | 'date' | 'meal'>[] };
 /** Maintenance calories measured from logged intake and the weight trend (instead of the formula estimate). */
@@ -85,6 +98,7 @@ export type MeasuredTdee = { kcal: number; date: string; days: number; intake: n
 export type AppState = {
   profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number;
   meals?: SavedMeal[]; tdee?: MeasuredTdee | null;
+  customExercises?: CatalogEntry[]; diet?: DietTargets | null; myDay?: { training: MyMeal[]; rest: MyMeal[] } | null;
   /** When this copy last changed, and ids removed on purpose: two devices' copies are merged with these. */
   updatedAt?: string; deleted?: Record<string, string>;
 };

@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Flame, Timer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import type { AppState, Profile, Session, SetResult } from '../lib/types';
+import type { AppState, CatalogEntry, Profile, Session, SetResult } from '../lib/types';
+import { loadCatalog } from '../lib/catalog';
+import { Technique } from './exercise-picker';
 import { alternatives, howTo, suggest, history, rampSets, warmupFor, bestE1rm, e1rm, type Suggestion } from '../lib/planner';
 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="field"><span>{label}</span>{children}</label>; }
@@ -68,7 +70,7 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
     {strength && s.exercises.map((e, ei) => {
       const tip = tips[e.id];
       const h = howTo(e.name);
-      const alts = alternatives(p, e);
+      const alts = state.plan?.custom ? [] : alternatives(p, e);
       const firstOfPattern = e.role === 'main' && e.increment > 0 && (ei === 0 || s.exercises.slice(0, ei).every(x => x.family !== e.family)) && ei < 3;
       const ramp = firstOfPattern ? rampSets(e.name, tip.load, e.low) : [];
       const Icon = tip.kind === 'up' ? TrendingUp : tip.kind === 'down' ? TrendingDown : Minus;
@@ -91,6 +93,7 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
           <label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev => tick(i, ev.target.checked, e.rest)} /><span>{x.set}</span></label>
           {(['weight', 'reps', 'rir'] as const).map(k => <input key={k} disabled={(k === 'weight' && e.increment === 0) || (k === 'rir' && (e.unit === 'seconds' || e.family === 'plyo'))} aria-label={`${e.name} serie ${x.set} ${k}`} type="number" inputMode="decimal" min={0} max={k === 'weight' ? 400 : k === 'reps' ? 300 : 10} step={k === 'weight' ? '.5' : '1'} placeholder={k === 'weight' ? (e.increment === 0 ? '—' : 'kg') : k === 'reps' ? String(e.high) : String(e.rir)} value={k === 'reps' && x.reps === 0 ? '' : x[k] ?? ''} onChange={ev => setR(a => a.map((v, j) => j === i ? { ...v, [k]: ev.target.value ? Number(ev.target.value) : k === 'reps' ? 0 : null } : (k === 'weight' && v.exerciseId === e.id && j > i && !recorded[j] ? { ...v, weight: ev.target.value ? Number(ev.target.value) : null } : v)))} />)}
         </div> : null)}
+        {!h && e.catalogId && <details className="howto"><summary>Tecnica</summary><CatalogTechnique id={e.catalogId} own={state.customExercises ?? []} /></details>}
         {h && <details className="howto"><summary>Tecnica{alts.length > 1 ? ' e alternative' : ''}</summary>
           <p>{h.setup}</p>
           <ol>{h.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
@@ -124,4 +127,13 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
       <button type="button" onClick={() => setRest(null)}>Salta</button>
     </div>}
   </form>;
+}
+
+/** Technique and photos of a library or own exercise, loaded when opened. */
+function CatalogTechnique({ id, own }: { id: string; own: CatalogEntry[] }) {
+  const [e, setE] = useState<CatalogEntry | null | undefined>(() => own.find(x => x.id === id));
+  useEffect(() => { if (e === undefined) loadCatalog().then(l => setE(l.find(x => x.id === id) ?? null)).catch(() => setE(null)); }, [e, id]);
+  if (e === undefined) return <p className="note"><span className="spinner" /></p>;
+  if (!e || (!e.s.length && !e.img?.length)) return <p className="note">Nessuna descrizione per questo esercizio.</p>;
+  return <Technique e={e} />;
 }

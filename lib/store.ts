@@ -1,6 +1,7 @@
 // Client-side state: every action runs the coaching engine in the browser and the result is saved on this device.
-import { emptyState, type AppState, type CheckIn, type FoodEntry, type Measurement, type Profile, type SavedMeal, type WorkoutLog } from './types';
-import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal, measureTdee } from './planner';
+import { emptyState, type AppState, type CatalogEntry, type CheckIn, type DietTargets, type Exercise, type FoodEntry, type Measurement, type MyMeal, type Plan, type Profile, type SavedMeal, type Session, type WorkoutLog } from './types';
+import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal, measureTdee, sessionTime } from './planner';
+import { findGeneric } from './foods';
 import { answer } from './coach';
 
 const KEY = 'tempra-state-v1';
@@ -56,6 +57,12 @@ export type Action =
   | { type: 'foods'; data: (Omit<FoodEntry, 'id'> & { id?: string })[] }
   | { type: 'mealSave'; data: { name: string; items: Omit<FoodEntry, 'id' | 'date' | 'meal'>[] } }
   | { type: 'mealDelete'; data: string }
+  | { type: 'customExercise'; data: Omit<CatalogEntry, 'id' | 'src' | 'c' | 'l' | 'mu'> & { id?: string } }
+  | { type: 'customExerciseDelete'; data: string }
+  | { type: 'customPlan'; data: { id?: string; title: string; day: number; exercises: Exercise[] }[] }
+  | { type: 'coachPlan' }
+  | { type: 'diet'; data: DietTargets | null }
+  | { type: 'myDay'; data: { training: MyMeal[]; rest: MyMeal[] } | null }
   | { type: 'reset' };
 
 /** Apply one action to a copy of the state. Throws an Error with a user-facing message when the action is not allowed. */
@@ -159,6 +166,47 @@ export function apply(prev: AppState, action: Action): AppState {
       s.meals = [...(s.meals ?? []).filter(m => m.name.toLowerCase() !== name.toLowerCase()), meal].slice(-200);
       break;
     }
+    case 'customExercise': {
+      const d = action.data, name = clean(d.n, 80);
+      if (!name) throw Error('Dai un nome all’esercizio.');
+      if (!d.g?.length) throw Error('Scegli almeno un muscolo.');
+      const e: CatalogEntry = { id: d.id ?? 'c-' + id(), n: name, eq: clean(d.eq, 30) || 'altro', mu: [], g: d.g.slice(0, 4), c: 'forza', l: 1, s: (d.s ?? []).map(x => clean(x, 300)).filter(Boolean).slice(0, 8), unit: d.unit === 'seconds' ? 'seconds' : undefined, src: 'custom' };
+      s.customExercises = [...(s.customExercises ?? []).filter(x => x.id !== e.id), e].slice(-300);
+      break;
+    }
+    case 'customExerciseDelete': s.customExercises = (s.customExercises ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
+    case 'customPlan': {
+      if (!s.profile) throw Error('Prima compila il profilo.');
+      s.plan = customPlan(action.data, s.plan);
+      s.decisions.push({ id: id(), date: now(), title: 'Piano tuo', reason: `${s.plan.sessions.length} sedute a settimana scelte da te. Non cambio esercizi, serie e giorni: ti suggerisco il carico di ogni esercizio dalla volta prima e il riscaldamento.`, sources: cite('progression', 'autoregulation'), rule: 'custom-plan' });
+      break;
+    }
+    case 'coachPlan': {
+      if (!s.profile) throw Error('Prima compila il profilo.');
+      s.plan = generatePlan(s.profile);
+      s.decisions.push({ id: id(), date: now(), title: 'Piano del coach', reason: s.plan.blueprint?.summary ?? '', sources: [], rule: 'initial-plan' });
+      break;
+    }
+    case 'diet': {
+      const d = action.data;
+      if (d) for (const k of ['training', 'rest'] as const) {
+        const m = d[k];
+        num(m.protein, 0, 500); num(m.carbs, 0, 1200); num(m.fat, 0, 400);
+        m.kcal = Math.round(m.protein * 4 + m.carbs * 4 + m.fat * 9);
+        if (m.kcal < 1000 || m.kcal > 6000) throw Error('Le calorie devono stare tra 1000 e 6000 al giorno.');
+      }
+      s.diet = d;
+      break;
+    }
+    case 'myDay': {
+      const d = action.data;
+      if (d) for (const k of ['training', 'rest'] as const) {
+        d[k] = d[k].slice(0, 8).map(m => ({ name: clean(m.name, 40) || 'Pasto', items: m.items.filter(i => findGeneric(i.food)).slice(0, 15).map(i => ({ food: i.food, grams: num(Math.round(i.grams), 1, 2000) })) })).filter(m => m.items.length);
+        if (!d[k].length) throw Error(`Aggiungi almeno un alimento alla giornata ${k === 'training' ? 'di allenamento' : 'di riposo'}.`);
+      }
+      s.myDay = d;
+      break;
+    }
     case 'mealDelete': s.meals = (s.meals ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
     case 'foodDelete': s.foods = (s.foods ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
     case 'measureDelete': s.measurements = (s.measurements ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
@@ -181,6 +229,32 @@ export function apply(prev: AppState, action: Action): AppState {
   s.revision = prev.revision + 1;
   s.updatedAt = new Date().toISOString();
   return s;
+}
+
+/** The person's own plan: their days, exercises and sets. The week counter and last loads carry over from a previous own plan. */
+function customPlan(days: { id?: string; title: string; day: number; exercises: Exercise[] }[], prev: Plan | null): Plan {
+  if (!days.length) throw Error('Aggiungi almeno un giorno di allenamento.');
+  if (days.length > 7 || new Set(days.map(d => d.day)).size !== days.length) throw Error('Ogni giorno della settimana può avere una sola seduta.');
+  const keep = prev?.custom ? prev : null;
+  const loads = new Map((prev?.sessions ?? []).flatMap(x => x.exercises).map(e => [e.name, e.load]));
+  const sessions: Session[] = days.map(d => {
+    if (!d.exercises.length) throw Error(`«${d.title || 'Seduta'}»: aggiungi almeno un esercizio.`);
+    const exercises = d.exercises.slice(0, 20).map(e => {
+      const unit = e.unit === 'seconds' ? 'seconds' : 'reps';
+      const low = num(Math.round(e.low), 1, unit === 'seconds' ? 600 : 100), high = num(Math.round(e.high), low, unit === 'seconds' ? 600 : 100);
+      return { ...e, id: e.id || id(), name: clean(e.name, 80), sets: num(Math.round(e.sets), 1, 10), low, high, rir: num(Math.round(e.rir), 0, 5), rest: num(Math.round(e.rest), 15, 600), load: e.load ?? loads.get(e.name) ?? null, unit } as Exercise;
+    });
+    const groups = exercises.flatMap(e => e.muscles ?? []);
+    const lower = groups.filter(g => ['quads', 'hamstrings', 'glutes', 'calves'].includes(g)).length, upper = groups.length - lower;
+    const s: Session = {
+      id: d.id || id(), day: num(d.day, 0, 6), type: 'strength', title: clean(d.title, 40) || 'Seduta', duration: 0, rationale: '', sources: [], exercises,
+      kind: lower > upper * 2 ? 'lower' : upper > lower * 2 ? 'upper' : 'full', targetRpe: 7,
+      phases: [{ label: 'Riscaldamento', minutes: 8, effort: 'Cardio leggero, mobilità e serie di avvicinamento' }, { label: 'Ritorno alla calma e note della seduta', minutes: 3, effort: 'Facile' }],
+    };
+    s.duration = sessionTime(s);
+    return s;
+  }).sort((a, b) => a.day - b.day);
+  return { id: keep?.id ?? id(), createdAt: keep?.createdAt ?? now(), version: (prev?.version ?? 0) + 1, week: keep?.week ?? 1, sessions, notes: [], blocked: false, custom: true, engineVersion: prev?.engineVersion };
 }
 
 /** Remember removed ids, so merging with another device's copy does not bring them back. */

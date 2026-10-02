@@ -2,8 +2,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Footprints, MessageCircle, Utensils, CalendarDays, Gauge, UserRound, Plus, ShieldCheck, Download, Upload, Trash2, Moon, Activity, ArrowRight, ChartLine, SendHorizontal, Eraser, LogOut } from 'lucide-react';
 import { type AppState, type Session, type Decision, type Profile, type Measurement, emptyState, dayNames, goalNames } from '../lib/types';
-import { nutrition, activityFrom, coreGoal, weeklySummary } from '../lib/planner';
+import { coreGoal, weeklySummary } from '../lib/planner';
 import { load, save, apply, clearLocal, type Action } from '../lib/store';
+import { nutritionFor } from '../lib/diet';
+import { PlanBuilder } from './plan-builder';
+import { DietEditor } from './diet-editor';
 import Workout from './workout';
 import { Questionnaire, defaults } from './questionnaire';
 import { Modal } from './modal';
@@ -36,6 +39,8 @@ export default function CoachApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [chat, setChat] = useState('');
   const [check, setCheck] = useState(false);
+  const [build, setBuild] = useState(false);
+  const [dietEdit, setDietEdit] = useState(false);
   const [review, setReview] = useState<Decision[] | null>(null);
   const [welcome, setWelcome] = useState(true);
   const [reveal, setReveal] = useState(false);
@@ -143,7 +148,7 @@ export default function CoachApp() {
   const doneIds = new Set(logs.filter(x => x.completed !== false).map(x => x.sessionId));
   const today = todayIndex();
   const next = plan?.sessions.filter(x => !doneIds.has(x.id)).sort((a, b) => ((a.day - today + 7) % 7) - ((b.day - today + 7) % 7))[0];
-  const n = p ? nutrition(p, activityFrom(p, plan), s.tdee) : null;
+  const n = p ? nutritionFor(s) : null;
   const todayTraining = !!plan?.sessions.some(x => x.day === today);
   const modal = (title: string, body: ReactNode, close: () => void) => <Modal title={title} close={close}>{error && <div className="error" role="alert">{error}</div>}{body}</Modal>;
   const save1 = (v: Profile) => { if (act({ type: 'profile', data: v })) { setEdit(false); setReveal(true); setTab('home'); } };
@@ -222,9 +227,9 @@ export default function CoachApp() {
           </section>
         </>}
 
-        {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} onEdit={() => setEdit(true)} onNext={() => { if (confirm('Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
+        {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} onEdit={() => setEdit(true)} onBuild={() => setBuild(true)} onCoach={() => { if (confirm('Tornare al piano del coach? Il tuo piano verrà sostituito; il diario resta.')) act({ type: 'coachPlan' }); }} onNext={() => { if (confirm(plan.custom ? 'Chiudere la settimana? Il tuo piano resta uguale.' : 'Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
 
-        {!reveal && tab === 'food' && p && n && <Diet n={n} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} act={act} />} />}
+        {!reveal && tab === 'food' && p && n && <Diet n={n} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} personalise={() => setDietEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} act={act} />} />}
 
         {!reveal && tab === 'progress' && <Progress state={s} add={() => setMeasure('new')} edit={m => setMeasure(m)} remove={m => { if (confirm(`Eliminare la misurazione del ${new Date(m.date + 'T12:00:00').toLocaleDateString('it-IT')}${Object.keys(m.photos).length ? ' e le sue foto' : ''}?`)) { act({ type: 'measureDelete', data: m.id }); deletePhotos(Object.values(m.photos)); } }} />}
 
@@ -263,6 +268,8 @@ export default function CoachApp() {
       {auth === 'in' && <div className="account"><span>Account: <b>{email}</b></span><button className="secondary" onClick={logout}><LogOut size={16} /> Esci</button></div>}</>, () => setEdit(false))}
     {measure && modal(measure === 'new' ? 'Nuova misurazione' : 'Modifica misurazione', <MeasureForm initial={measure === 'new' ? null : measure} save={m => { if (act({ type: 'measure', data: m })) setMeasure(null); else throw Error('Controlla i valori inseriti.'); }} />, () => setMeasure(null))}
     {session && modal(session.title, <Workout key={session.exercises.map(x => x.id).join(',')} profile={p} state={s} deload={!!bp?.meso.deload} changeVariant={data => act({ type: 'variant', data: data as { sessionId: string; exerciseId: string; name: string } })} session={session} save={x => { if (act({ type: 'log', data: x as never })) setSession(null); }} />, () => setSession(null))}
+    {build && modal(plan?.custom ? 'Il mio piano' : 'Crea il tuo piano', <PlanBuilder plan={plan} custom={s.customExercises ?? []} act={act} done={() => setBuild(false)} />, () => setBuild(false))}
+    {dietEdit && p && modal('La mia dieta', <DietEditor state={s} coach={nutritionFor({ ...s, diet: null, myDay: null })} act={act} done={() => setDietEdit(false)} />, () => setDietEdit(false))}
     {check && modal('Come stai oggi?', <CheckIn save={v => { if (act({ type: 'checkin', data: v as never })) setCheck(false); }} />, () => setCheck(false))}
     {review && modal('Il commento del coach', <>{review.map(d => <div className="decision" key={d.id}><h3>{d.title}</h3><p>{d.reason}</p></div>)}</>, () => setReview(null))}
   </div>;
