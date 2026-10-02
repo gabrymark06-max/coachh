@@ -605,6 +605,9 @@ footer { max-width: 1240px; margin: 0 auto; padding: 20px 40px 36px; color: var(
 .mealpick button { font-size: 13px; }
 .qty { display: flex; flex-direction: column; gap: 12px; }
 .qtyhead { display: flex; gap: 12px; align-items: center; }
+.productphoto { flex: none; display: block; width: 100%; height: 168px; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: #fff; cursor: zoom-in; transition: height .2s ease; }
+.productphoto img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+.productphoto.zoom { height: min(60vh, 440px); cursor: zoom-out; }
 .qtyhead img { width: 56px; height: 56px; object-fit: contain; border-radius: 10px; background: var(--steel); }
 .qtyhead h3 { font-size: 18px; }
 .gramsbig { display: flex; align-items: baseline; gap: 10px; border-bottom: 2px solid var(--graphite); padding: 4px 2px; }

@@ -98,6 +98,17 @@ function Manual({ choose, readLabel }: { choose: (f: FoodItem, s: FoodEntry['sou
   </form>;
 }
 
+/** Open Food Facts serves each photo in several sizes: lists use the small one, the product card a sharper one. */
+const sized = (url: string, size: '400' | 'full') => url.replace(/\.(100|200|400)\.jpg$/, `.${size}.jpg`);
+
+function ProductPhoto({ src, name }: { src: string; name: string }) {
+  const [zoom, setZoom] = useState(false);
+  const [big, setBig] = useState(true);
+  return <button type="button" className={'productphoto' + (zoom ? ' zoom' : '')} aria-label={zoom ? 'Riduci la foto' : `Ingrandisci la foto di ${name}`} onClick={() => setZoom(!zoom)}>
+    <img src={big ? sized(src, zoom ? 'full' : '400') : src} alt="" onError={() => setBig(false)} />
+  </button>;
+}
+
 function Quantity({ item, meal, setMeal, back, swap, save }: { item: Picked; meal: MealSlot; setMeal: (m: MealSlot) => void; back?: () => void; swap: (f: FoodItem) => void; save: (grams: number) => void }) {
   const [grams, setGrams] = useState(String(item.grams ?? item.serving ?? 100));
   const g = Number(grams.replace(',', '.')) || 0;
@@ -105,13 +116,14 @@ function Quantity({ item, meal, setMeal, back, swap, save }: { item: Picked; mea
   const chips = [...new Set([item.serving, 50, 100, 150, 200].filter((x): x is number => !!x))];
   const other = item.brand ? null : counterpart(item.name);
   return <form className="qty" onSubmit={e => { e.preventDefault(); if (g > 0) save(g); }}>
-    <div className="qtyhead">{item.image && <img src={item.image} alt="" />}<div><h3>{item.name}</h3><small>{item.brand ? `${item.brand} · ` : ''}{fmt(item.kcal)} kcal per 100 g</small></div></div>
+    {item.image && <ProductPhoto src={item.image} name={item.name} />}
+    <div className="qtyhead"><div><h3>{item.name}</h3><small>{item.brand ? `${item.brand} · ` : ''}{fmt(item.kcal)} kcal per 100 g</small></div></div>
     {other && <div className="segmented full rawcooked">
       <button type="button" aria-pressed={other.cooked} onClick={() => { if (!other.cooked) swap(other.food); }}>Pesato crudo</button>
       <button type="button" aria-pressed={!other.cooked} onClick={() => { if (other.cooked) swap(other.food); }}>Pesato cotto</button>
     </div>}
     <label className="gramsbig"><input type="number" inputMode="decimal" min={1} max={3000} step="any" autoFocus value={grams} onChange={e => setGrams(e.target.value)} /><span>grammi</span></label>
-    <div className="chiprow">{chips.map(c => <button type="button" key={c} className={'chip' + (g === c ? ' on' : '')} onClick={() => setGrams(String(c))}>{c === item.serving ? `${item.servingLabel ?? 'porzione'} · ${c} g` : `${c} g`}</button>)}</div>
+    <div className="chiprow">{chips.map(c => <button type="button" key={c} className={'chip' + (g === c ? ' on' : '')} onClick={() => setGrams(String(c))}>{c === item.serving && (item.servingLabel ?? '').replace(/\s/g, '').toLowerCase() !== `${c}g` ? `${item.servingLabel ?? 'porzione'} · ${c} g` : `${c} g`}</button>)}</div>
     <div className="qtymacros num"><span><b>{fmt(m.kcal)}</b> kcal</span><span><b>{m.p}</b> P</span><span><b>{m.c}</b> C</span><span><b>{m.f}</b> G</span></div>
     <MealSelect meal={meal} setMeal={setMeal} />
     <div className="qtyactions">{back && <button type="button" className="secondary" onClick={back}>Indietro</button>}<button className="primary big" disabled={g <= 0}><Check size={18} /> {item.id ? 'Salva' : 'Aggiungi'}</button></div>
