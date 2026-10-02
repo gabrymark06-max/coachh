@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @next/next/no-img-element -- product thumbnails come from Open Food Facts and local blob: URLs */
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, ScanBarcode, Camera, History, PenLine, Check, FileText, Trash2 } from 'lucide-react';
 import type { FoodEntry, MealSlot, SavedMeal } from '../../lib/types';
@@ -33,7 +32,6 @@ export function Picker({ initial, date, recent, meals, add, addMany, deleteMeal 
 
 function FoodOption({ f, onClick }: { f: FoodItem; onClick: () => void }) {
   return <button type="button" className="foodopt" onClick={onClick}>
-    {f.image ? <img src={f.image} alt="" /> : <span className="foodicon" />}
     <span className="grow"><b>{f.name}</b><small>{f.brand ? `${f.brand} · ` : ''}{fmt(f.kcal)} kcal · P {f.p} · C {f.c} · G {f.f} <i>/100 g</i></small></span>
     <Plus size={18} />
   </button>;
@@ -71,7 +69,7 @@ function Recent({ list, meals, choose, logMeal, deleteMeal }: { list: FoodEntry[
   if (!items.length && !meals.length) return <p className="note center">Qui trovi gli alimenti che registri, per aggiungerli di nuovo con un tocco.</p>;
   return <>
     {meals.length > 0 && <><p className="pickerlabel">Pasti salvati</p>{[...meals].reverse().map(m => <div className="savedmeal" key={m.id}>
-      <button type="button" className="foodopt" onClick={() => logMeal(m)}><span className="foodicon" /><span className="grow"><b>{m.name}</b><small>{m.items.map(x => x.name).join(', ')} · {fmt(m.items.reduce((t, x) => t + forGrams(x, x.grams).kcal, 0))} kcal</small></span><Plus size={18} /></button>
+      <button type="button" className="foodopt" onClick={() => logMeal(m)}><span className="grow"><b>{m.name}</b><small>{m.items.map(x => x.name).join(', ')} · {fmt(m.items.reduce((t, x) => t + forGrams(x, x.grams).kcal, 0))} kcal</small></span><Plus size={18} /></button>
       <button type="button" className="iconbtn small" aria-label={`Elimina ${m.name}`} onClick={() => { if (confirm(`Eliminare il pasto salvato «${m.name}»?`)) deleteMeal(m.id); }}><Trash2 size={15} /></button>
     </div>)}</>}
     {items.length > 0 && <p className="pickerlabel">Alimenti recenti</p>}
@@ -98,17 +96,6 @@ function Manual({ choose, readLabel }: { choose: (f: FoodItem, s: FoodEntry['sou
   </form>;
 }
 
-/** Open Food Facts serves each photo in several sizes: lists use the small one, the product card a sharper one. */
-const sized = (url: string, size: '400' | 'full') => url.replace(/\.(100|200|400)\.jpg$/, `.${size}.jpg`);
-
-function ProductPhoto({ src, name }: { src: string; name: string }) {
-  const [zoom, setZoom] = useState(false);
-  const [big, setBig] = useState(true);
-  return <button type="button" className={'productphoto' + (zoom ? ' zoom' : '')} aria-label={zoom ? 'Riduci la foto' : `Ingrandisci la foto di ${name}`} onClick={() => setZoom(!zoom)}>
-    <img src={big ? sized(src, zoom ? 'full' : '400') : src} alt="" onError={() => setBig(false)} />
-  </button>;
-}
-
 function Quantity({ item, meal, setMeal, back, swap, save }: { item: Picked; meal: MealSlot; setMeal: (m: MealSlot) => void; back?: () => void; swap: (f: FoodItem) => void; save: (grams: number) => void }) {
   const [grams, setGrams] = useState(String(item.grams ?? item.serving ?? 100));
   const g = Number(grams.replace(',', '.')) || 0;
@@ -116,7 +103,6 @@ function Quantity({ item, meal, setMeal, back, swap, save }: { item: Picked; mea
   const chips = [...new Set([item.serving, 50, 100, 150, 200].filter((x): x is number => !!x))];
   const other = item.brand ? null : counterpart(item.name);
   return <form className="qty" onSubmit={e => { e.preventDefault(); if (g > 0) save(g); }}>
-    {item.image && <ProductPhoto src={item.image} name={item.name} />}
     <div className="qtyhead"><div><h3>{item.name}</h3><small>{item.brand ? `${item.brand} · ` : ''}{fmt(item.kcal)} kcal per 100 g</small></div></div>
     {other && <div className="segmented full rawcooked">
       <button type="button" aria-pressed={other.cooked} onClick={() => { if (!other.cooked) swap(other.food); }}>Pesato crudo</button>
