@@ -370,8 +370,6 @@ footer { max-width: 1240px; margin: 0 auto; padding: 20px 40px 36px; color: var(
 .warmup li span { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-left: 6px; }
 .exhead { display: flex; gap: 12px; align-items: flex-start; }
 .exhead .grow { flex: 1; min-width: 0; }
-.swapbtn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: 14px; color: var(--ink); }
-.swapbtn.on { background: var(--graphite); border-color: var(--graphite); color: #fff; }
 .swaplist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; padding: 12px; border-radius: 14px; background: var(--steel); }
 .swaplist small { color: var(--muted); font-size: 13px; }
 .swaplist button { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 50px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: 15px; text-align: left; color: var(--ink); }
@@ -786,6 +784,8 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 .workout .swaplist { margin-top: 10px; }
 .workout .swaplist button { min-height: 46px; }
 .workout .finish { border: 0; padding-top: 8px; }
+.exswap { padding: 0; }
+.wend { width: 100%; margin-top: 6px; }
 .planswitch { margin: -8px 0 20px; max-width: 420px; background: var(--steel-2); }
 
 /* Plan builder: week strip, collapsible days, compact exercises with steppers */

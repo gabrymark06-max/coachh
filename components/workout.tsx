@@ -27,6 +27,8 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
   const [dur, setDur] = useState<string | null>(null);
   const [swapping, setSwapping] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // The end-of-session questions appear only once the person says they have finished.
+  const [finished, setFinished] = useState(false);
   const doneSets = Object.values(recorded).filter(Boolean).length;
 
   useEffect(() => { if (!running) return; const t = setInterval(() => setSeconds(x => x + 1), 1000); return () => clearInterval(t); }, [running]);
@@ -82,13 +84,15 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
         <div className="exhead">
           <div className="grow"><h3>{e.name}</h3><small className="num">{e.sets} × {e.low}–{e.high}{e.unit === 'seconds' ? ' s' : ''}{e.family === 'plyo' || e.unit === 'seconds' ? '' : ` · RIR ${e.rir}`} · rec. {e.rest >= 60 ? `${Math.floor(e.rest / 60)}′${e.rest % 60 ? String(e.rest % 60).padStart(2, '0') : ''}` : `${e.rest}″`}</small></div>
           {(h || e.catalogId) && <button type="button" className={'exicon' + (info === e.id ? ' on' : '')} aria-label={`Tecnica: ${e.name}`} aria-expanded={info === e.id} onClick={() => setInfo(info === e.id ? null : e.id)}><Info size={18} /></button>}
-          {alts.length > 1 && <button type="button" className={'exicon swapbtn' + (swapping === e.id ? ' on' : '')} aria-label={`Cambia ${e.name}`} aria-expanded={swapping === e.id} onClick={() => setSwapping(swapping === e.id ? null : e.id)}><ArrowLeftRight size={18} /></button>}
+          {alts.length > 1 && <button type="button" className={'exicon exswap' + (swapping === e.id ? ' on' : '')} aria-label={`Cambia ${e.name}`} aria-expanded={swapping === e.id} onClick={() => setSwapping(swapping === e.id ? null : e.id)}><ArrowLeftRight size={18} /></button>}
         </div>
         {swapping === e.id && <div className="swaplist" role="group" aria-label={`Alternative a ${e.name}`}>
           <small>Cambia con:</small>
           {alts.filter(n => n !== e.name).map(n => <button type="button" key={n} onClick={() => { if (Object.values(recorded).some(Boolean) && !confirm('Cambiare esercizio azzera le serie non ancora salvate. Continuare?')) return; changeVariant({ sessionId: s.id, exerciseId: e.id, name: n }); setSwapping(null); }}>{n}<ArrowLeftRight size={15} /></button>)}
         </div>}
         {info === e.id && <div className="howto">
+          {tip.kind === 'start' && e.increment > 0 && <p><b>Prima volta:</b> trova un carico da {e.high} ripetizioni con {e.rir} di riserva.</p>}
+          {ramp.length > 0 && <p className="ramp">Avvicinamento: {ramp.join(' → ')}</p>}
           {h ? <>
             <p>{h.setup}</p>
             <ol>{h.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
@@ -96,13 +100,11 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
             {e.family !== 'core' && e.family !== 'plyo' && <p className="tempo">Discesa in 2–3 secondi{h.stretch ? ', un secondo di pausa in allungamento' : ''}, salita decisa.</p>}
           </> : <CatalogTechnique id={e.catalogId!} own={state.customExercises ?? []} />}
         </div>}
-        <div className={'target ' + tip.kind}>
-          {tip.kind !== 'start' && <Icon size={16} />}
-          <p>{tip.load ? <><b>{kg(tip.load)}</b> · {tip.target}</> : tip.kind === 'start' && e.increment > 0 ? <><b>Prima volta:</b> trova un carico da {e.high} ripetizioni con {e.rir} di riserva</> : <><b>Obiettivo:</b> {tip.target}</>}
-            {tip.last && <small> · prima {tip.last}</small>}</p>
-        </div>
+        {tip.load ? <div className={'target ' + tip.kind}>
+          <Icon size={16} />
+          <p><b>{kg(tip.load)}</b>{tip.last && <small> · prima {tip.last}</small>}</p>
+        </div> : null}
         {tip.kind === 'down' && <p className="exwhy">{tip.why}</p>}
-        {ramp.length > 0 && <p className="ramp">Avvicinamento: {ramp.join(' → ')}</p>}
         <div className="setheader"><span>Serie</span><span>Kg</span><span>{e.unit === 'seconds' ? 'Sec' : 'Rip'}</span><span>RIR</span></div>
         {r.map((x, i) => x.exerciseId === e.id ? <div className={'setrow' + (recorded[i] ? ' done' : '') + (recorded[i] && isPr(x, e.rir) ? ' pr' : '')} key={i}>
           <label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev => tick(i, ev.target.checked, e.rest)} /><span>{x.set}</span></label>
@@ -113,7 +115,9 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
 
     {strength && s.phases.length > 2 && <div className="phases">{s.phases.slice(1, -1).map((x, i) => <div key={i}><span>+</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes}′</strong></div>)}</div>}
 
-    <section className="finish">
+    {!finished && <button type="button" className="primary big wend" onClick={() => { setFinished(true); setRunning(false); setRest(null); setTimeout(() => document.querySelector('.workout .finish')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}><Check size={18} /> Termina allenamento</button>}
+
+    {finished && <section className="finish">
       <h3>Com’è andata?</h3>
       <div className="formgrid">
         <Field label="Seduta"><select value={complete ? 'full' : 'partial'} onChange={e => setComplete(e.target.value === 'full')}><option value="full">Completa</option><option value="partial">Parziale</option></select></Field>
@@ -125,7 +129,7 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
       <Field label="Note per il coach (facoltative)"><textarea name="note" maxLength={1000} placeholder="Es. panca: spalla un po’ rigida, squat facile" /></Field>
       {missing && <p className="note">Spunta tutte le serie, oppure scegli «Parziale».</p>}
       <button className="primary big" disabled={missing}>Salva <Check size={18} /></button>
-    </section>
+    </section>}
 
     {rest && <div className="resttimer" role="status">
       <span>Recupero</span><strong className="num">{clock(Math.max(0, Math.ceil((rest.until - now) / 1000)))}</strong>

@@ -108,11 +108,15 @@ try {
     await tab('Oggi');
     await click('Inizia l’allenamento'); await sleep(600);
     assert.ok(await ev(`document.querySelectorAll('.setrow').length > 3`), 'set rows');
-    await ev(`document.querySelector('.swapbtn').click()`); await sleep(300);
+    await ev(`document.querySelector('.exswap').click()`); await sleep(300);
     await shot('4b-swap');
     const swapTo = await ev(`document.querySelector('.swaplist button').textContent`);
     await ev(`document.querySelector('.swaplist button').click()`); await sleep(500);
     assert.ok(await ev(`[...document.querySelectorAll('.exercise h3')].some(h => h.textContent === ${JSON.stringify(swapTo)})`), 'exercise swapped from the header button');
+    assert.ok(!(await has('Com’è andata?')), 'feedback hidden until the end');
+    await click('Termina allenamento'); await sleep(400);
+    assert.ok(await has('Com’è andata?'), 'feedback shown after finishing');
+    await ev(`document.querySelector('.modal').scrollTop = 0`); await sleep(200);
     await shot('4-workout');
   });
 
