@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node tests/coach.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui": "node tests/ui.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
@@ -20,12 +21,14 @@
     "lucide-react": "1.31.0",
     "next": "16.3.8",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/web-push": "^3.6.4",
     "esbuild": "0.27.2",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.8",

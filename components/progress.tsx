@@ -98,8 +98,11 @@ export function Progress({ state: s, add, edit, remove }: { state: AppState; add
   const strength = useMemo(() => {
     const names = new Set(s.logs.flatMap(l => l.results.map(r => r.name).filter(Boolean) as string[]));
     return [...names].map(name => {
-      const h = history(s, name).map(x => ({ date: x.date, v: bestE1rm(x) })).filter((x): x is { date: string; v: number } => x.v !== null);
-      return { name, h, change: h.length > 1 ? h.at(-1)!.v / h[0].v - 1 : 0 };
+      const all = history(s, name);
+      const h = all.map(x => ({ date: x.date, v: bestE1rm(x) })).filter((x): x is { date: string; v: number } => x.v !== null);
+      // Personal record: the heaviest set, with its reps and date.
+      const top = all.flatMap(x => x.sets.filter(y => y.weight).map(y => ({ ...y, date: x.date }))).sort((a, b) => b.weight! - a.weight! || b.reps - a.reps)[0];
+      return { name, h, top, change: h.length > 1 ? h.at(-1)!.v / h[0].v - 1 : 0 };
     }).filter(x => x.h.length >= 2).sort((a, b) => b.h.length - a.h.length).slice(0, 8);
   }, [s]);
   const height = s.profile?.height;
@@ -125,7 +128,7 @@ export function Progress({ state: s, add, edit, remove }: { state: AppState; add
     {strength.length > 0 && <section className="panel block"><h2>Forza stimata</h2><p className="note">Massimale stimato dalle tue serie (carico, ripetizioni e RIR).</p>
       <div className="lifts">{strength.map(x => {
         const lo = Math.min(...x.h.map(p => p.v)), hi = Math.max(...x.h.map(p => p.v)), sp = Math.max(1, hi - lo);
-        return <div className="lift" key={x.name}><span>{x.name}</span>
+        return <div className="lift" key={x.name}><span>{x.name}{x.top && <small className="num">Record {fmt(x.top.weight!)} kg × {x.top.reps} · {dayLong(x.top.date)}</small>}</span>
           <svg viewBox="0 0 100 28" className="spark" aria-hidden><polyline points={x.h.map((p, i) => `${(i / (x.h.length - 1)) * 100},${26 - ((p.v - lo) / sp) * 24}`).join(' ')} /></svg>
           <strong className={'num ' + (x.change >= 0 ? 'up' : 'down')}>{sign(Math.round(x.change * 1000) / 10)}%</strong></div>;
       })}</div></section>}

@@ -78,7 +78,16 @@ export type FoodEntry = {
   id: string; date: string; meal: MealSlot; name: string; brand?: string; grams: number;
   kcal: number; p: number; c: number; f: number; code?: string; source: 'barcode' | 'search' | 'generic' | 'photo' | 'label' | 'manual' | 'recent';
 };
-export type AppState = { profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number };
+/** A meal saved to log again with one tap: foods with their grams. */
+export type SavedMeal = { id: string; name: string; items: Omit<FoodEntry, 'id' | 'date' | 'meal'>[] };
+/** Maintenance calories measured from logged intake and the weight trend (instead of the formula estimate). */
+export type MeasuredTdee = { kcal: number; date: string; days: number; intake: number; weeklyChange: number };
+export type AppState = {
+  profile: Profile | null; plan: Plan | null; logs: WorkoutLog[]; checkins: CheckIn[]; decisions: Decision[]; messages: Message[]; measurements: Measurement[]; foods: FoodEntry[]; revision: number;
+  meals?: SavedMeal[]; tdee?: MeasuredTdee | null;
+  /** When this copy last changed, and ids removed on purpose: two devices' copies are merged with these. */
+  updatedAt?: string; deleted?: Record<string, string>;
+};
 export type Paper = { id: string; title: string; authors: string; year: number; doi: string; pmid: string; url: string; topics: string[]; study_type: string; population: string; finding: string; limitations: string; coach_use: string; access_level: string; oa_full_text_url: string; collections: string[] };
 export const dayNames = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 export const goalNames: Record<Goal, string> = { 'fat-loss': 'Dimagrire', recomp: 'Ricomposizione corporea', muscle: 'Mettere massa', strength: 'Diventare più forte', health: 'Stare in forma', balanced: 'Ricomposizione corporea', running: 'Stare in forma' };

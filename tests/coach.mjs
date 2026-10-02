@@ -264,6 +264,35 @@ assert(/ALIMENTAZIONE REGISTRATA OGGI: 520 kcal/.test(buildContext(s)), 'Chat co
 s = apply(s, { type: 'foodDelete', data: s.foods[0].id }); assert.equal(s.foods.length, 1);
 s = apply(s, { type: 'clearChat' }); assert.equal(s.messages.length, 0);
 s = apply(s, { type: 'reset' }); assert.equal(s.profile, null);
+// Two devices: both sets of foods survive, a removal on one device is not undone by the other, saved meals sync.
+{
+  const day = '2026-10-02', food = (name, meal) => ({ date: day, meal, name, grams: 100, kcal: 100, p: 10, c: 10, f: 2, source: 'manual' });
+  let phone = apply(E.emptyState ? E.emptyState() : { profile: null, plan: null, logs: [], checkins: [], decisions: [], messages: [], measurements: [], foods: [], revision: 0 }, { type: 'foods', data: [food('Uova', 'breakfast'), food('Pane', 'breakfast')] });
+  let laptop = structuredClone(phone);
+  phone = apply(phone, { type: 'food', data: food('Pollo', 'lunch') });
+  laptop = apply(laptop, { type: 'foodDelete', data: laptop.foods.find(f => f.name === 'Pane').id });
+  laptop = apply(laptop, { type: 'mealSave', data: { name: 'Colazione solita', items: phone.foods.filter(f => f.meal === 'breakfast') } });
+  const m1 = E.merge(phone, laptop), m2 = E.merge(laptop, phone);
+  assert.deepEqual(m1.foods.map(f => f.name).sort(), ['Pollo', 'Uova'], 'Merge keeps both devices and the removal');
+  assert.ok(E.sameData(m1, m2), 'Merge does not depend on the order');
+  assert.equal(m1.meals.length, 1); assert.equal(m1.meals[0].items.length, 2);
+  assert.throws(() => apply(phone, { type: 'mealSave', data: { name: '', items: phone.foods } }));
+}
+// Measured maintenance: 2500 kcal logged while losing 0.5 kg a week → about 2500 + 0.5 × 7700 / 7 ≈ 3050 kcal.
+{
+  const t0 = Date.parse('2026-10-02T12:00:00Z'), day = 86400000, iso = ms => new Date(ms).toISOString().slice(0, 10);
+  const st = { profile: null, plan: null, logs: [], decisions: [], messages: [], measurements: [], revision: 0, checkins: [], foods: [] };
+  for (let i = 0; i < 21; i++) {
+    const d = iso(t0 - i * day);
+    st.foods.push({ id: 'b' + i, date: d, meal: 'breakfast', name: 'x', grams: 100, kcal: 1000, p: 0, c: 0, f: 0, source: 'manual' }, { id: 'l' + i, date: d, meal: 'lunch', name: 'y', grams: 100, kcal: 1500, p: 0, c: 0, f: 0, source: 'manual' });
+    if (i % 3 === 0) st.checkins.push({ id: 'c' + i, date: new Date(t0 - i * day).toISOString(), sleep: 7, fatigue: 2, soreness: 2, pain: false, note: '', weight: 80 + i * 0.5 / 7 });
+  }
+  const m = E.measureTdee(st, t0);
+  assert.ok(m && Math.abs(m.kcal - 3050) <= 30, 'Measured maintenance ' + JSON.stringify(m));
+  assert.equal(E.measureTdee({ ...st, foods: st.foods.slice(0, 10) }, t0), null, 'Too few logged days → no measurement');
+  const b = E.blendTdee(2500, m, t0);
+  assert.ok(b.measured && b.tdee > 2500 && b.tdee <= 2500 * 1.25, 'Blend stays within the equation bounds');
+}
 console.log('Store: profile, validation, logging, check-in, week, chat, measurements, food diary, coach context and reset passed.');
 
 // 9. Coach answers.

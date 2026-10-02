@@ -673,3 +673,28 @@ footer { max-width: 1240px; margin: 0 auto; padding: 20px 40px 36px; color: var(
   .panel { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- v3: records, saved meals, dictation, reminders ---------- */
+.setrow { position: relative; }
+.setrow.pr::after { content: 'Record'; position: absolute; right: 4px; top: -9px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 7px; border-radius: 99px; background: var(--straw); color: var(--straw-ink); pointer-events: none; }
+.lift > span { display: flex; flex-direction: column; min-width: 0; }
+.lift > span small { color: var(--muted); font-size: 12px; }
+.copyday { width: 100%; justify-content: center; margin-top: var(--gap); }
+.mealcard header { display: flex; align-items: center; gap: 8px; }
+.mealcard header small { margin-left: auto; }
+.savedmeal { display: flex; align-items: center; gap: 6px; }
+.savedmeal .foodopt { flex: 1; min-width: 0; }
+.textmeal { display: flex; flex-direction: column; gap: 10px; }
+.dictate { position: relative; display: block; }
+.dictate textarea { padding-right: 52px; }
+.dictate .mic { position: absolute; right: 8px; bottom: 8px; }
+.mic.live { background: var(--danger); color: #fff; border-color: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .65; } }
+@media (prefers-reduced-motion: reduce) { .mic.live { animation: none; } }
+.rawcooked button { font-size: 13px; }
+.reminders { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 0; border-top: 1px solid var(--line); margin-top: 14px; }
+.reminders > div { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; }
+.reminders small { color: var(--muted); font-size: 13px; }
+.reminders .formerror { flex-basis: 100%; }
+.weekly { display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 4px 0 14px; }
+.weekly li { list-style: none; }

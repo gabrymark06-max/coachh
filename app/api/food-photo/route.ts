@@ -4,7 +4,7 @@
 // (the decomposition + database grounding approach of Open-KNEAD and of apps like SnapCalorie). A description or a
 // correction from the person is passed back in to refine the estimate.
 // label: reads the nutrition table of a package, per 100 g.
-import { signedIn, limited } from '../../../lib/server-auth';
+import { signedIn, limited, withinDailyQuota } from '../../../lib/server-auth';
 import { genericFoods, findGeneric } from '../../../lib/foods';
 
 export const runtime = 'nodejs';
@@ -91,14 +91,17 @@ async function gemini(key: string, parts: unknown[], schema: unknown): Promise<{
 export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: 'Il riconoscimento delle foto non è attivo.' }, { status: 503 });
-  if (!(await signedIn(req))) return Response.json({ error: 'Accedi di nuovo per usare le foto.' }, { status: 401 });
+  const user = await signedIn(req);
+  if (!user) return Response.json({ error: 'Accedi di nuovo per usare le foto.' }, { status: 401 });
+  if (!(await withinDailyQuota(user, 'photo', 80))) return Response.json({ error: 'Hai usato molte analisi oggi: riprova domani oppure usa il codice a barre e la ricerca.' }, { status: 429 });
   if (limited(req, 'photo', 30)) return Response.json({ error: 'Troppe foto in poco tempo: riprova tra qualche minuto.' }, { status: 429 });
-  const body = await req.json().catch(() => null) as { image?: string; mode?: string; note?: string; previous?: Prev[] } | null;
+  const body = await req.json().catch(() => null) as { image?: string; text?: string; mode?: string; note?: string; previous?: Prev[] } | null;
   const image = body?.image?.replace(/^data:image\/\w+;base64,/, '');
-  if (!image || image.length > 6_000_000) return Response.json({ error: 'Foto non valida.' }, { status: 400 });
-  const photo = { inlineData: { mimeType: 'image/jpeg', data: image } };
+  const described = body?.mode === 'text' ? body.text?.trim().slice(0, 800) : undefined;
+  if (body?.mode === 'text' ? !described : !image || image.length > 6_000_000) return Response.json({ error: body?.mode === 'text' ? 'Scrivi cosa hai mangiato.' : 'Foto non valida.' }, { status: 400 });
+  const photo = image ? { inlineData: { mimeType: 'image/jpeg', data: image } } : null;
 
-  if (body?.mode === 'label') {
+  if (body?.mode === 'label' && photo) {
     const out = await gemini(key, [photo, { text: LABEL }], labelSchema);
     if (!out.ok) return Response.json({ error: out.status === 503 ? 'Servizio molto richiesto: riprova tra un minuto.' : 'Non sono riuscito a leggere l’etichetta.' }, { status: 502 });
     try {
@@ -116,8 +119,10 @@ export async function POST(req: Request) {
     note && `INDICAZIONI DELLA PERSONA (hanno la precedenza su quello che vedi): «${note}»`,
     previous && `STIMA PRECEDENTE, da correggere secondo le indicazioni: ${previous}`,
   ].filter(Boolean).join('\n');
-  const prompt = `${MEAL}\n${extra ? `\n${extra}\n` : ''}\nTABELLA (un alimento per riga, valori per 100 g):\n${TABLE}`;
-  const out = await gemini(key, [photo, { text: prompt }], mealSchema);
+  // A written or dictated meal goes through the same decomposition and table grounding, with typical portions when grams are missing.
+  const intro = photo ? MEAL : `${MEAL.replace('stimi porzioni da foto', 'ricavi alimenti e porzioni da una descrizione scritta')}\nNon c’è una foto: usa la DESCRIZIONE. Se mancano i grammi usa porzioni tipiche italiane e metti la sicurezza a "media".\nDESCRIZIONE DEL PASTO: «${described}»`;
+  const prompt = `${intro}\n${extra ? `\n${extra}\n` : ''}\nTABELLA (un alimento per riga, valori per 100 g):\n${TABLE}`;
+  const out = await gemini(key, photo ? [photo, { text: prompt }] : [{ text: prompt }], mealSchema);
   if (!out.ok) return Response.json({ error: out.status === 503 ? 'Servizio molto richiesto: riprova tra un minuto.' : 'Non sono riuscito ad analizzare la foto.' }, { status: 502 });
   try {
     const parsed = JSON.parse(out.text) as { dish?: string; question?: string; items: Raw[] };

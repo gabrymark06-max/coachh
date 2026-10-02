@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Flame, Timer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { AppState, Profile, Session, SetResult } from '../lib/types';
-import { alternatives, howTo, suggest, history, rampSets, warmupFor, type Suggestion } from '../lib/planner';
+import { alternatives, howTo, suggest, history, rampSets, warmupFor, bestE1rm, e1rm, type Suggestion } from '../lib/planner';
 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="field"><span>{label}</span>{children}</label>; }
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -14,6 +14,9 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
   const tips = useMemo(() => Object.fromEntries(s.exercises.map(e => [e.id, suggest(e, history(state, e.name), { deload })])) as Record<string, Suggestion>, [s, state, deload]);
   const [r, setR] = useState<SetResult[]>(() => s.exercises.flatMap(e => Array.from({ length: e.sets }, (_, i) => ({ exerciseId: e.id, set: i + 1, weight: tips[e.id]?.load ?? e.load, reps: 0, rir: null }))));
   const [recorded, setRecorded] = useState<Record<number, boolean>>({});
+  // Best estimated max so far per exercise: a set that beats it is flagged as a personal record right away (immediate feedback helps performance).
+  const best = useMemo(() => Object.fromEntries(s.exercises.map(e => [e.id, Math.max(0, ...history(state, e.name).map(x => bestE1rm(x, e.rir) ?? 0))])), [s, state]);
+  const isPr = (x: SetResult, rir: number) => !!x.weight && x.reps > 0 && best[x.exerciseId] > 0 && e1rm(x.weight, x.reps, x.rir ?? rir) > best[x.exerciseId] * 1.005;
   const [complete, setComplete] = useState(true);
   const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(false);
@@ -84,7 +87,7 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
         </div>
         {ramp.length > 0 && <p className="ramp"><b>Avvicinamento</b> {ramp.join(' → ')}</p>}
         <div className="setheader"><span>Serie</span><span>Kg</span><span>{e.unit === 'seconds' ? 'Secondi' : 'Ripetizioni'}</span><span>RIR</span></div>
-        {r.map((x, i) => x.exerciseId === e.id ? <div className={'setrow' + (recorded[i] ? ' done' : '')} key={i}>
+        {r.map((x, i) => x.exerciseId === e.id ? <div className={'setrow' + (recorded[i] ? ' done' : '') + (recorded[i] && isPr(x, e.rir) ? ' pr' : '')} key={i}>
           <label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev => tick(i, ev.target.checked, e.rest)} /><span>{x.set}</span></label>
           {(['weight', 'reps', 'rir'] as const).map(k => <input key={k} disabled={(k === 'weight' && e.increment === 0) || (k === 'rir' && (e.unit === 'seconds' || e.family === 'plyo'))} aria-label={`${e.name} serie ${x.set} ${k}`} type="number" inputMode="decimal" min={0} max={k === 'weight' ? 400 : k === 'reps' ? 300 : 10} step={k === 'weight' ? '.5' : '1'} placeholder={k === 'weight' ? (e.increment === 0 ? '—' : 'kg') : k === 'reps' ? String(e.high) : String(e.rir)} value={k === 'reps' && x.reps === 0 ? '' : x[k] ?? ''} onChange={ev => setR(a => a.map((v, j) => j === i ? { ...v, [k]: ev.target.value ? Number(ev.target.value) : k === 'reps' ? 0 : null } : (k === 'weight' && v.exerciseId === e.id && j > i && !recorded[j] ? { ...v, weight: ev.target.value ? Number(ev.target.value) : null } : v)))} />)}
         </div> : null)}

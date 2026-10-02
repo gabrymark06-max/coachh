@@ -1,6 +1,6 @@
 // Coach chat backed by the Gemini API. The browser sends the conversation, a compact summary of the person's
 // plan, diary and measurements, and the most relevant evidence cards; the key stays on the server.
-import { signedIn, limited } from '../../../lib/server-auth';
+import { signedIn, limited, withinDailyQuota } from '../../../lib/server-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,9 @@ Sicurezza:
 export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: 'not-configured' }, { status: 503 });
-  if (!(await signedIn(req))) return Response.json({ error: 'Accedi di nuovo per parlare con il coach.' }, { status: 401 });
+  const user = await signedIn(req);
+  if (!user) return Response.json({ error: 'Accedi di nuovo per parlare con il coach.' }, { status: 401 });
+  if (!(await withinDailyQuota(user, 'coach', 150))) return Response.json({ error: 'Hai fatto molte domande oggi: il coach torna disponibile domani.' }, { status: 429 });
   if (limited(req, 'coach', 40)) return Response.json({ error: 'Troppe domande in poco tempo: riprova tra qualche minuto.' }, { status: 429 });
   let body: { messages?: Turn[]; context?: string; evidence?: Card[] };
   try { body = await req.json(); } catch { return Response.json({ error: 'Richiesta non valida.' }, { status: 400 }); }

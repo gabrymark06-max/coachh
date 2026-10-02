@@ -28,7 +28,7 @@ export function buildContext(s: AppState): string {
         out.push(`- ${dayNames[x.day]}: ${x.title}${done.has(x.id) ? ' [fatta]' : ''} · ${ex}${cardio ? ` · ${cardio}` : ''}`);
       } else out.push(`- ${dayNames[x.day]}: ${x.title}${done.has(x.id) ? ' [fatta]' : ''} · ${x.phases.map(ph => `${ph.minutes}′ ${ph.label}`).join(', ')}`);
     }
-    const n = nutrition(p, activityFrom(p, plan));
+    const n = nutrition(p, activityFrom(p, plan), s.tdee);
     if (!n.blocked && n.average) out.push(`NUTRIZIONE: fase ${n.phaseLabel}, ${n.training?.kcal} kcal nei giorni di allenamento e ${n.rest?.kcal} a riposo, proteine ${n.average.protein} g, carboidrati ${n.average.carbs} g, grassi ${n.average.fat} g. ${n.weeklyChange ?? ''}`);
   }
   const logs = s.logs.slice(-8);

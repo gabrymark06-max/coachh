@@ -1,6 +1,6 @@
 // Client-side state: every action runs the coaching engine in the browser and the result is saved on this device.
-import { emptyState, type AppState, type CheckIn, type FoodEntry, type Measurement, type Profile, type WorkoutLog } from './types';
-import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal } from './planner';
+import { emptyState, type AppState, type CheckIn, type FoodEntry, type Measurement, type Profile, type SavedMeal, type WorkoutLog } from './types';
+import { generatePlan, progressAfterLog, nextWeek, alternatives, now, id, cite, resolveGoal, measureTdee } from './planner';
 import { answer } from './coach';
 
 const KEY = 'tempra-state-v1';
@@ -53,6 +53,9 @@ export type Action =
   | { type: 'clearChat' }
   | { type: 'food'; data: Omit<FoodEntry, 'id'> & { id?: string } }
   | { type: 'foodDelete'; data: string }
+  | { type: 'foods'; data: (Omit<FoodEntry, 'id'> & { id?: string })[] }
+  | { type: 'mealSave'; data: { name: string; items: Omit<FoodEntry, 'id' | 'date' | 'meal'>[] } }
+  | { type: 'mealDelete'; data: string }
   | { type: 'reset' };
 
 /** Apply one action to a copy of the state. Throws an Error with a user-facing message when the action is not allowed. */
@@ -121,7 +124,7 @@ export function apply(prev: AppState, action: Action): AppState {
       s.messages = s.messages.slice(-80);
       break;
     }
-    case 'clearChat': s.messages = []; break;
+    case 'clearChat': tomb(s, s.messages.map(m => m.id)); s.messages = []; break;
     case 'measure': {
       const d = action.data;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw Error('Data non valida.');
@@ -137,23 +140,62 @@ export function apply(prev: AppState, action: Action): AppState {
       break;
     }
     case 'food': {
-      const d = action.data;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw Error('Data non valida.');
-      if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(d.meal)) throw Error('Pasto non valido.');
-      const name = clean(d.name, 120);
-      if (!name) throw Error('Scrivi il nome dell’alimento.');
-      const e: FoodEntry = {
-        id: d.id ?? id(), date: d.date, meal: d.meal, name, brand: d.brand ? clean(d.brand, 80) : undefined, grams: num(d.grams, 1, 3000),
-        kcal: num(d.kcal, 0, 950), p: num(d.p, 0, 100), c: num(d.c, 0, 100), f: num(d.f, 0, 100), code: d.code, source: d.source,
-      };
+      const e = validFood(action.data);
       s.foods = [...(s.foods ?? []).filter(x => x.id !== e.id), e].slice(-4000);
       break;
     }
-    case 'foodDelete': s.foods = (s.foods ?? []).filter(x => x.id !== action.data); break;
-    case 'measureDelete': s.measurements = (s.measurements ?? []).filter(x => x.id !== action.data); break;
-    case 'reset': return { ...emptyState(), revision: prev.revision + 1 };
+    case 'foods': {
+      if (!action.data.length) throw Error('Niente da aggiungere.');
+      const list = action.data.slice(0, 40).map(validFood), ids = new Set(list.map(x => x.id));
+      s.foods = [...(s.foods ?? []).filter(x => !ids.has(x.id)), ...list].slice(-4000);
+      break;
+    }
+    case 'mealSave': {
+      const name = clean(action.data.name, 60);
+      if (!name) throw Error('Dai un nome al pasto.');
+      if (!action.data.items.length) throw Error('Il pasto è vuoto.');
+      const items = action.data.items.slice(0, 30).map(x => { const f = validFood({ ...x, date: '2000-01-01', meal: 'lunch' }); return { name: f.name, brand: f.brand, grams: f.grams, kcal: f.kcal, p: f.p, c: f.c, f: f.f, code: f.code, source: f.source }; });
+      const meal: SavedMeal = { id: id(), name, items };
+      s.meals = [...(s.meals ?? []).filter(m => m.name.toLowerCase() !== name.toLowerCase()), meal].slice(-200);
+      break;
+    }
+    case 'mealDelete': s.meals = (s.meals ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
+    case 'foodDelete': s.foods = (s.foods ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
+    case 'measureDelete': s.measurements = (s.measurements ?? []).filter(x => x.id !== action.data); tomb(s, [action.data]); break;
+    case 'reset': {
+      const out: AppState = { ...emptyState(), revision: prev.revision + 1, deleted: { ...prev.deleted } };
+      tomb(out, [...prev.logs, ...prev.checkins, ...prev.decisions, ...prev.messages, ...(prev.measurements ?? []), ...(prev.foods ?? []), ...(prev.meals ?? [])].map(x => x.id));
+      out.updatedAt = new Date().toISOString();
+      return out;
+    }
+  }
+  // Every two weeks, with enough food log and weigh-ins, maintenance calories are re-measured on the person.
+  if (['food', 'foods', 'checkin', 'measure'].includes(action.type) && (!s.tdee || Date.now() - Date.parse(s.tdee.date) > 14 * 86400000)) {
+    const t = measureTdee(s);
+    if (t) {
+      s.tdee = t;
+      s.decisions.push({ id: id(), date: now(), title: `Mantenimento misurato: ${t.kcal.toLocaleString('it-IT')} kcal`, reason: `Negli ultimi ${t.days} giorni registrati hai mangiato in media ${t.intake.toLocaleString('it-IT')} kcal e il peso è cambiato di ${t.weeklyChange >= 0 ? '+' : ''}${t.weeklyChange.toLocaleString('it-IT')} kg a settimana. Gli obiettivi di calorie ora partono da questo valore, non solo dalla formula.`, sources: cite('adaptiveTdee'), rule: 'measured-tdee' });
+    }
   }
   s.decisions = s.decisions.slice(-200);
   s.revision = prev.revision + 1;
+  s.updatedAt = new Date().toISOString();
   return s;
+}
+
+/** Remember removed ids, so merging with another device's copy does not bring them back. */
+function tomb(s: AppState, ids: string[]) {
+  const at = new Date().toISOString();
+  s.deleted = { ...s.deleted, ...Object.fromEntries(ids.map(x => [x, at])) };
+}
+
+function validFood(d: Omit<FoodEntry, 'id'> & { id?: string }): FoodEntry {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw Error('Data non valida.');
+  if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(d.meal)) throw Error('Pasto non valido.');
+  const name = clean(d.name, 120);
+  if (!name) throw Error('Scrivi il nome dell’alimento.');
+  return {
+    id: d.id ?? id(), date: d.date, meal: d.meal, name, brand: d.brand ? clean(d.brand, 80) : undefined, grams: num(d.grams, 1, 3000),
+    kcal: num(d.kcal, 0, 950), p: num(d.p, 0, 100), c: num(d.c, 0, 100), f: num(d.f, 0, 100), code: d.code, source: d.source,
+  };
 }

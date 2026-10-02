@@ -1,4 +1,5 @@
-import type { Phase, Profile } from '../types';
+import { blendTdee } from './tdee';
+import type { MeasuredTdee, Phase, Profile } from '../types';
 import { phaseNames } from '../types';
 import { cite } from './refs';
 import { sampleDay, swaps, type Meal, type Macros } from './meals';
@@ -7,7 +8,7 @@ export type BodyFatBand = 'lean' | 'ok' | 'high-ish' | 'high' | null;
 export type NutritionPlan = {
   blocked: boolean; reason: string;
   phase: Phase | null; phaseLabel: string; phaseReason: string; rate: number; weeklyChange: string | null;
-  bodyFat: number | null; band: BodyFatBand; bmr: number | null; tdee: number | null;
+  bodyFat: number | null; band: BodyFatBand; bmr: number | null; tdee: number | null; tdeeMeasured?: boolean;
   calories: number[] | null; average: Macros | null; training: Macros | null; rest: Macros | null;
   protein: number[] | null; fiber: number | null; water: number | null; carbsPerKg: number[] | null; fat: number | null; carbs: number | null;
   timeline: { week: number; weight: number }[]; meals: { training: Meal[]; rest: Meal[] } | null; swaps: { group: string; items: string[] }[];
@@ -65,7 +66,7 @@ export function recommendPhase(p: Profile): { phase: Phase; rate: number; reason
 
 const r10 = (x: number) => Math.round(x / 10) * 10;
 
-export function nutrition(p: Profile, activity: Activity = { gymDays: Math.max(1, p.days.length - 1), cardioMinutes: 60, steps: p.steps ?? 6000 }): NutritionPlan {
+export function nutrition(p: Profile, activity: Activity = { gymDays: Math.max(1, p.days.length - 1), cardioMinutes: 60, steps: p.steps ?? 6000 }, measured?: MeasuredTdee | null): NutritionPlan {
   const tips: NutritionPlan['tips'] = [];
   const base: NutritionPlan = {
     blocked: false, reason: '', phase: null, phaseLabel: '—', phaseReason: '', rate: 0, weeklyChange: null, bodyFat: bodyFat(p), band: bandOf(p), bmr: null, tdee: null,
@@ -91,7 +92,8 @@ export function nutrition(p: Profile, activity: Activity = { gymDays: Math.max(1
   const bmr = 10 * w + 6.25 * p.height - 5 * p.age + (p.sex === 'male' ? 5 : -161);
   const job = { low: 1.3, medium: 1.42, high: 1.55 }[p.activity];
   const factor = Math.min(2.1, job + 0.03 * activity.gymDays + activity.cardioMinutes * 0.0005 + Math.max(0, activity.steps - 5000) / 1000 * 0.02);
-  const tdee = bmr * factor;
+  const formula = bmr * factor;
+  const { tdee, measured: fromData } = blendTdee(formula, measured);
   let target = tdee;
   if (rec.phase === 'cut') target = tdee - Math.min(tdee * 0.25, w * Math.abs(rec.rate) / 100 * 7700 / 7);
   if (rec.phase === 'recomp') target = tdee * (rec.rate < 0 ? 0.9 : 1);
@@ -119,7 +121,8 @@ export function nutrition(p: Profile, activity: Activity = { gymDays: Math.max(1
   // A rest day never shows more food than a training day: with equal targets, or when portion floors keep it high, reuse the training day.
   out.meals = { training: trainingDay, rest: out.rest.kcal >= out.training.kcal || kcalOf(restDay) > kcalOf(trainingDay) ? trainingDay : restDay };
   out.swaps = swaps(p);
-  out.reason = `Fabbisogno stimato ${r10(tdee)} kcal: equazione di Mifflin-St Jeor (errore individuale ±10%) per un fattore che conta lavoro, ${activity.gymDays} sedute di palestra, ${activity.cardioMinutes} minuti di cardio e ${activity.steps.toLocaleString('it-IT')} passi. Non sommare le calorie dello smartwatch: sono già comprese.`;
+  out.tdeeMeasured = fromData;
+  out.reason = fromData ? `Mantenimento misurato su di te: ${r10(measured!.kcal)} kcal dalle calorie registrate e dall’andamento del peso, combinato con la stima dell’equazione (${r10(formula)} kcal).` : `Fabbisogno stimato ${r10(tdee)} kcal: equazione di Mifflin-St Jeor (errore individuale ±10%) per un fattore che conta lavoro, ${activity.gymDays} sedute di palestra, ${activity.cardioMinutes} minuti di cardio e ${activity.steps.toLocaleString('it-IT')} passi. Non sommare le calorie dello smartwatch: sono già comprese.`;
   out.sources = cite('energyEstimate', 'protein', rec.phase === 'cut' ? 'deficit' : rec.phase === 'gain' ? 'surplus' : 'recomposition', 'bodyFat');
   // Practical guidance by phase.
   tips.push({ title: 'Come capire se funziona', text: rec.phase === 'recomp' && rec.rate === 0 ? 'Il peso cambierà poco: misura il giro vita ogni 2 settimane (stessa ora, ombelico, a fine espirazione) e segui i carichi in palestra. Vita che scende e carichi che salgono = ricomposizione riuscita.' : `Pesati 3–7 volte a settimana al mattino e guarda la media settimanale. Obiettivo: ${out.weeklyChange.toLowerCase()}. Misura anche il giro vita ogni 2 settimane. Se dopo 2 settimane la media non va come previsto, correggo di 100–200 kcal.`, sources: cite('weighing', 'bodyFat') });

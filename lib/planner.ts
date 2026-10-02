@@ -5,3 +5,5 @@ export { muscleNames, howTo } from './engine/exercises';
 export { bodyFat, bandOf, recommendPhase, type NutritionPlan } from './engine/nutrition';
 export { coreGoal } from './engine/cardio';
 export { suggest, history, rampSets, warmupFor, describe, bestE1rm, e1rm, nameOf, type Suggestion, type Performance } from './engine/progression';
+export { measureTdee, blendTdee } from './engine/tdee';
+export { weeklySummary } from './engine/summary';

@@ -133,6 +133,15 @@ export const genericFoods: FoodItem[] = [
   g('Ravioli ricotta e spinaci (crudi)', 260, 10, 38, 7, 125, 'porzione'),
   g('Riso integrale (crudo)', 350, 7.5, 74, 2.5, 80, 'porzione'),
   g('Riso integrale (cotto)', 125, 2.7, 26, 1, 180, 'piatto'),
+  // Versioni da cotto, per chi pesa dopo la cottura
+  g('Pasta integrale (cotta)', 150, 5.5, 29, 1.1, 200, 'piatto'),
+  g('Riso basmati (cotto)', 125, 2.8, 28, 0.3, 180, 'piatto'),
+  g('Farro (cotto)', 130, 5.5, 26, 1, 180, 'piatto'),
+  g('Quinoa (cotta)', 120, 4.4, 21, 1.9, 180, 'piatto'),
+  g('Cous cous (cotto)', 112, 3.8, 23, 0.2, 180, 'piatto'),
+  g('Manzo magro (cotto)', 190, 30, 0, 7.5, 120, 'porzione'),
+  g('Fesa di tacchino (cotta)', 145, 30, 0, 2.5, 120, 'porzione'),
+  g('Merluzzo (cotto)', 105, 23, 0, 0.9, 150, 'porzione'),
   g('Orzo perlato (crudo)', 330, 10, 70, 1.5, 80, 'porzione'),
   g('Polenta (cotta)', 70, 1.6, 15, 0.4, 250, 'porzione'),
   g('Farina 00', 345, 11, 72, 1, 50, 'porzione'),
@@ -397,3 +406,13 @@ export const forGrams = (f: Pick<FoodItem, 'kcal' | 'p' | 'c' | 'f'>, grams: num
 const byName = new Map(genericFoods.map(f => [norm(f.name), f]));
 /** Generic food with exactly this name (accents and apostrophes ignored). */
 export const findGeneric = (name: string) => byName.get(norm(name.trim()));
+
+const SWAP: [string, string][] = [['(crudo)', '(cotto)'], ['(cruda)', '(cotta)'], ['(crudi)', '(cotti)'], ['(crude)', '(cotte)']];
+/** The same food weighed the other way (raw ↔ cooked), when the table has both: pasta, rice, meat, legumes. */
+export function counterpart(name: string): { food: FoodItem; cooked: boolean } | null {
+  for (const [raw, cooked] of SWAP) {
+    if (name.includes(raw)) { const f = findGeneric(name.replace(raw, cooked)); if (f) return { food: f, cooked: true }; }
+    if (name.includes(cooked)) { const f = findGeneric(name.replace(cooked, raw)); if (f) return { food: f, cooked: false }; }
+  }
+  return null;
+}
