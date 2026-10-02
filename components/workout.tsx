@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, Flame, Timer, TrendingUp, TrendingDown, Minus, ArrowLeftRight } from 'lucide-react';
+import { Check, Flame, Timer, TrendingUp, TrendingDown, Minus, ArrowLeftRight, Info, ChevronDown } from 'lucide-react';
 import type { AppState, CatalogEntry, Profile, Session, SetResult } from '../lib/types';
 import { loadCatalog } from '../lib/catalog';
 import { Technique } from './exercise-picker';
@@ -26,6 +26,8 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
   const [now, setNow] = useState(nowMs);
   const [dur, setDur] = useState<string | null>(null);
   const [swapping, setSwapping] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const doneSets = Object.values(recorded).filter(Boolean).length;
 
   useEffect(() => { if (!running) return; const t = setInterval(() => setSeconds(x => x + 1), 1000); return () => clearInterval(t); }, [running]);
   useEffect(() => {
@@ -52,19 +54,20 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
     save({ sessionId: s.id, duration: Number(d.get('duration')), rpe: Number(d.get('rpe')), pain: d.get('pain') === 'on', distance: d.get('distance') ? Number(d.get('distance')) : null, note: String(d.get('note') ?? ''), completed: complete, readiness: 3, actualRunMinutes: d.get('actualRunMinutes') ? Number(d.get('actualRunMinutes')) : null, results: r.filter((_, i) => recorded[i]) });
   }}>
     <div className="wtop">
-      <span className="tag">{s.duration} min{strength ? ` · ${total} serie` : ''}{deload ? ' · scarico' : ''}</span>
-      <button type="button" className="secondary" onClick={() => setRunning(!running)}><Timer size={16} /> {clock(seconds)} · {running ? 'Pausa' : 'Avvia'}</button>
+      <span className="wmeta num">{strength ? `${doneSets}/${total} serie` : `${s.duration} min`}{deload ? ' · scarico' : ''}</span>
+      <button type="button" className={'wclock num' + (running ? ' on' : '')} onClick={() => setRunning(!running)} aria-label={running ? 'Metti in pausa il cronometro' : 'Avvia il cronometro'}><Timer size={15} /> {clock(seconds)}</button>
     </div>
+    {strength && <div className="wprogress" aria-hidden><span style={{ width: `${(doneSets / Math.max(1, total)) * 100}%` }} /></div>}
     {s.adaptation && <p className="adaptation">{s.adaptation}</p>}
 
-    {warm && <section className="warmup">
-      <h3><Flame size={18} /> Riscaldamento</h3>
+    {warm && <details className="warmup">
+      <summary><Flame size={16} /> Riscaldamento <ChevronDown size={16} className="chev" /></summary>
       <ol>
         <li><b>{warm.general}</b></li>
         {warm.drills.map(x => <li key={x.name}>{x.name} <span>{x.dose}</span></li>)}
         <li>Poi le serie di avvicinamento indicate sui primi esercizi.</li>
       </ol>
-    </section>}
+    </details>}
 
     {!strength && <div className="phases">{s.phases.map((x, i) => <div key={i}><span>{String(i + 1).padStart(2, '0')}</span><div><h3>{x.label}</h3><p>{x.effort}</p></div><strong>{x.minutes}′</strong></div>)}</div>}
 
@@ -77,35 +80,34 @@ export default function Workout({ session: s, profile: p, state, deload, changeV
       const Icon = tip.kind === 'up' ? TrendingUp : tip.kind === 'down' ? TrendingDown : Minus;
       return <section className="exercise" key={e.id}>
         <div className="exhead">
-          <span className="exnum num">{String(ei + 1).padStart(2, '0')}</span>
-          <div className="grow"><h3>{e.name}</h3><small className="num">{e.sets} × {e.low}–{e.high}{e.unit === 'seconds' ? ' s' : ''}{e.family === 'plyo' || e.unit === 'seconds' ? '' : ` · RIR ${e.rir}`} · recupero {e.rest >= 120 ? `${e.rest / 60}′` : `${e.rest}″`}</small></div>
-          {alts.length > 1 && <button type="button" className={'swapbtn' + (swapping === e.id ? ' on' : '')} aria-expanded={swapping === e.id} onClick={() => setSwapping(swapping === e.id ? null : e.id)}><ArrowLeftRight size={16} /> Cambia</button>}
+          <div className="grow"><h3>{e.name}</h3><small className="num">{e.sets} × {e.low}–{e.high}{e.unit === 'seconds' ? ' s' : ''}{e.family === 'plyo' || e.unit === 'seconds' ? '' : ` · RIR ${e.rir}`} · rec. {e.rest >= 60 ? `${Math.floor(e.rest / 60)}′${e.rest % 60 ? String(e.rest % 60).padStart(2, '0') : ''}` : `${e.rest}″`}</small></div>
+          {(h || e.catalogId) && <button type="button" className={'exicon' + (info === e.id ? ' on' : '')} aria-label={`Tecnica: ${e.name}`} aria-expanded={info === e.id} onClick={() => setInfo(info === e.id ? null : e.id)}><Info size={18} /></button>}
+          {alts.length > 1 && <button type="button" className={'exicon swapbtn' + (swapping === e.id ? ' on' : '')} aria-label={`Cambia ${e.name}`} aria-expanded={swapping === e.id} onClick={() => setSwapping(swapping === e.id ? null : e.id)}><ArrowLeftRight size={18} /></button>}
         </div>
         {swapping === e.id && <div className="swaplist" role="group" aria-label={`Alternative a ${e.name}`}>
-          <small>Macchina occupata o non ti piace? Scegli un'alternativa:</small>
+          <small>Cambia con:</small>
           {alts.filter(n => n !== e.name).map(n => <button type="button" key={n} onClick={() => { if (Object.values(recorded).some(Boolean) && !confirm('Cambiare esercizio azzera le serie non ancora salvate. Continuare?')) return; changeVariant({ sessionId: s.id, exerciseId: e.id, name: n }); setSwapping(null); }}>{n}<ArrowLeftRight size={15} /></button>)}
         </div>}
+        {info === e.id && <div className="howto">
+          {h ? <>
+            <p>{h.setup}</p>
+            <ol>{h.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
+            <p className="mistakes"><b>Evita:</b> {h.mistakes.join(' · ')}</p>
+            {e.family !== 'core' && e.family !== 'plyo' && <p className="tempo">Discesa in 2–3 secondi{h.stretch ? ', un secondo di pausa in allungamento' : ''}, salita decisa.</p>}
+          </> : <CatalogTechnique id={e.catalogId!} own={state.customExercises ?? []} />}
+        </div>}
         <div className={'target ' + tip.kind}>
-          <Icon size={18} />
-          <div>
-            <strong>{tip.load ? <>Oggi {kg(tip.load)} <span>· {tip.target}</span></> : tip.kind === 'start' && e.increment > 0 ? 'Prima volta: trova il carico' : `Obiettivo: ${tip.target}`}</strong>
-            {tip.last && <small>Ultima volta: {tip.last}</small>}
-            <small>{tip.why}</small>
-          </div>
+          {tip.kind !== 'start' && <Icon size={16} />}
+          <p>{tip.load ? <><b>{kg(tip.load)}</b> · {tip.target}</> : tip.kind === 'start' && e.increment > 0 ? <><b>Prima volta:</b> trova un carico da {e.high} ripetizioni con {e.rir} di riserva</> : <><b>Obiettivo:</b> {tip.target}</>}
+            {tip.last && <small> · prima {tip.last}</small>}</p>
         </div>
-        {ramp.length > 0 && <p className="ramp"><b>Avvicinamento</b> {ramp.join(' → ')}</p>}
-        <div className="setheader"><span>Serie</span><span>Kg</span><span>{e.unit === 'seconds' ? 'Secondi' : 'Ripetizioni'}</span><span>RIR</span></div>
+        {tip.kind === 'down' && <p className="exwhy">{tip.why}</p>}
+        {ramp.length > 0 && <p className="ramp">Avvicinamento: {ramp.join(' → ')}</p>}
+        <div className="setheader"><span>Serie</span><span>Kg</span><span>{e.unit === 'seconds' ? 'Sec' : 'Rip'}</span><span>RIR</span></div>
         {r.map((x, i) => x.exerciseId === e.id ? <div className={'setrow' + (recorded[i] ? ' done' : '') + (recorded[i] && isPr(x, e.rir) ? ' pr' : '')} key={i}>
           <label className="setcheck"><input aria-label={`${e.name} serie ${x.set} fatta`} type="checkbox" checked={!!recorded[i]} onChange={ev => tick(i, ev.target.checked, e.rest)} /><span>{x.set}</span></label>
           {(['weight', 'reps', 'rir'] as const).map(k => <input key={k} disabled={(k === 'weight' && e.increment === 0) || (k === 'rir' && (e.unit === 'seconds' || e.family === 'plyo'))} aria-label={`${e.name} serie ${x.set} ${k}`} type="number" inputMode="decimal" min={0} max={k === 'weight' ? 400 : k === 'reps' ? 300 : 10} step={k === 'weight' ? '.5' : '1'} placeholder={k === 'weight' ? (e.increment === 0 ? '—' : 'kg') : k === 'reps' ? String(e.high) : String(e.rir)} value={k === 'reps' && x.reps === 0 ? '' : x[k] ?? ''} onChange={ev => setR(a => a.map((v, j) => j === i ? { ...v, [k]: ev.target.value ? Number(ev.target.value) : k === 'reps' ? 0 : null } : (k === 'weight' && v.exerciseId === e.id && j > i && !recorded[j] ? { ...v, weight: ev.target.value ? Number(ev.target.value) : null } : v)))} />)}
         </div> : null)}
-        {!h && e.catalogId && <details className="howto"><summary>Tecnica</summary><CatalogTechnique id={e.catalogId} own={state.customExercises ?? []} /></details>}
-        {h && <details className="howto"><summary>Tecnica</summary>
-          <p>{h.setup}</p>
-          <ol>{h.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
-          <p className="mistakes"><b>Evita:</b> {h.mistakes.join(' · ')}</p>
-          {e.family !== 'core' && e.family !== 'plyo' && <p className="tempo">Discesa in 2–3 secondi{h.stretch ? ', un secondo di pausa in allungamento' : ''}, salita decisa.</p>}
-        </details>}
       </section>;
     })}
 

@@ -753,6 +753,39 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 .myitem .grow { display: flex; flex-direction: column; min-width: 0; }
 .myitem small { color: var(--muted); font-size: 12px; }
 .myadd { display: flex; flex-direction: column; gap: 6px; }
+/* Workout: minimal */
+.workout .wtop { margin: 4px 0 8px; }
+.wmeta { font-size: 13px; color: var(--muted); }
+.wclock { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 15px; font-weight: 600; color: var(--ink); }
+.wclock.on { background: var(--graphite); border-color: var(--graphite); color: #fff; }
+.wprogress { height: 4px; border-radius: 999px; background: var(--steel); overflow: hidden; margin-bottom: 14px; }
+.wprogress span { display: block; height: 100%; background: var(--ok); transition: width .25s ease; }
+.workout .warmup { padding: 0; border-radius: 14px; margin-bottom: 14px; }
+.workout .warmup summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 14px; font-weight: 600; color: var(--bronze-ink); cursor: pointer; }
+.workout .warmup summary::-webkit-details-marker { display: none; }
+.workout .warmup summary .chev { margin-left: auto; transition: transform .15s ease; }
+.workout .warmup[open] summary .chev { transform: rotate(180deg); }
+.workout .warmup ol { padding: 0 14px 14px 34px; font-size: 14px; }
+.workout .exercise { border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 14px; margin-bottom: 12px; }
+.workout .exhead { align-items: center; gap: 6px; }
+.workout .exhead h3 { font-size: 16.5px; line-height: 1.25; }
+.workout .exhead small { font-size: 12.5px; color: var(--muted); }
+.exicon { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--steel); color: var(--muted); display: grid; place-items: center; }
+.exicon.on { background: var(--graphite); color: #fff; }
+.workout .target { margin: 10px 0 4px; padding: 0; background: none; align-items: center; gap: 8px; }
+.workout .target p { margin: 0; font-size: 14px; color: var(--ink); }
+.workout .target p b { font-weight: 700; }
+.workout .target small { color: var(--muted); font-size: 13px; }
+.workout .target.up, .workout .target.down { background: none; }
+.exwhy { font-size: 13px; color: var(--danger); margin: 0 0 4px; }
+.workout .ramp { font-size: 12px; margin: 2px 0 6px; }
+.workout .setheader { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 4px; }
+.workout .setrow input[type=number] { min-height: 44px; background: var(--steel); border-color: transparent; text-align: center; }
+.workout .setrow.done input[type=number] { background: #2E7D5B14; border-color: transparent; }
+.workout .howto { margin: 10px 0 2px; padding: 10px 14px; }
+.workout .swaplist { margin-top: 10px; }
+.workout .swaplist button { min-height: 46px; }
+.workout .finish { border: 0; padding-top: 8px; }
 .planswitch { margin: -8px 0 20px; max-width: 420px; background: var(--steel-2); }
 
 /* Plan builder: week strip, collapsible days, compact exercises with steppers */
