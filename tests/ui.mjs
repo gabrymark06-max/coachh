@@ -116,6 +116,9 @@ try {
     assert.ok(!(await has('Com’è andata?')), 'feedback hidden until the end');
     await click('Termina allenamento'); await sleep(400);
     assert.ok(await has('Com’è andata?'), 'feedback shown after finishing');
+    await ev(`document.querySelector('.finish .primary').scrollIntoView({ block: 'end' })`); await sleep(300);
+    assert.ok(await ev(`(() => { const t = document.querySelector('.finish textarea').getBoundingClientRect(), b = document.querySelector('.finish .primary').getBoundingClientRect(); return b.top >= t.bottom; })()`), 'save button below the notes');
+    await shot('4c-finish');
     await ev(`document.querySelector('.modal').scrollTop = 0`); await sleep(200);
     await shot('4-workout');
   });

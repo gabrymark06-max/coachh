@@ -783,7 +783,11 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 .workout .howto { margin: 10px 0 2px; padding: 10px 14px; }
 .workout .swaplist { margin-top: 10px; }
 .workout .swaplist button { min-height: 46px; }
-.workout .finish { border: 0; padding-top: 8px; }
+.workout .finish { border: 0; padding-top: 8px; display: flex; flex-direction: column; gap: 14px; }
+.workout .finish .formgrid { margin: 0; }
+.workout .finish .check { margin: 0; }
+.workout .finish textarea { display: block; }
+.workout .finish .primary.big { width: 100%; margin-top: 4px; }
 .exswap { padding: 0; }
 .wend { width: 100%; margin-top: 6px; }
 .planswitch { margin: -8px 0 20px; max-width: 420px; background: var(--steel-2); }
