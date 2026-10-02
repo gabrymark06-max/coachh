@@ -116,12 +116,18 @@ try {
     await tab('Allenamento');
     await click('Crea il tuo piano');
     assert.ok(await ev(`document.querySelectorAll('.bday').length > 0`), 'builder starts from the current plan');
+    await ev(`document.querySelector('.bexrow').click()`); await sleep(300);
+    await shot('5a-builder');
+    const before = await ev(`document.querySelector('.bex.editing .stepper b').textContent`);
+    await ev(`document.querySelector('[aria-label="Serie più"]').click()`); await sleep(200);
+    assert.equal(Number(await ev(`document.querySelector('.bex.editing .stepper b').textContent`)), Number(before) + 1, 'stepper adds a set');
     await click('Aggiungi esercizio');
     assert.ok(await waitFor(`document.querySelectorAll('.xrow').length > 0`), 'library loaded');
     await type('.xpicker input', 'multipower squat');
     assert.ok(await waitFor(`[...document.querySelectorAll('.xrow b')].some(b => /multipower/i.test(b.textContent))`), 'search by Italian name');
     await ev(`document.querySelector('.xrow .xmain').click()`); await sleep(400);
-    await shot('5-builder', true);
+    await ev(`document.querySelector('.bex.editing')?.scrollIntoView({ block: 'center' })`);
+    await shot('5-builder');
     await click('Salva il mio piano'); await sleep(600);
     assert.ok(await has('Il tuo piano · settimana'), 'own plan active');
     await click('Piano del coach', '.planswitch button');
@@ -134,6 +140,11 @@ try {
   await step('own diet targets', async () => {
     await tab('Dieta');
     await click('Personalizza');
+    await shot('6a-targets');
+    await click('Giornata tipo', '[role=tab]');
+    assert.ok(await ev(`document.querySelectorAll('.mymeal .myitem').length > 0`), 'sample day starts from the coach');
+    await shot('6b-myday');
+    await click('Calorie e macro', '[role=tab]');
     await click('Salva'); await sleep(500);
     assert.ok(await has('La tua dieta.'), 'own targets active');
     await shot('6-diet', true);

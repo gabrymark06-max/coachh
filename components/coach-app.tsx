@@ -227,7 +227,7 @@ export default function CoachApp() {
           </section>
         </>}
 
-        {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} onEdit={() => setEdit(true)} hasOwn={!!(plan.custom || s.savedPlan?.custom)} onBuild={() => setBuild(true)} onSwitch={own => act({ type: own ? 'ownPlan' : 'coachPlan' })} onNext={() => { if (confirm(plan.custom ? 'Chiudere la settimana? Il tuo piano resta uguale.' : 'Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
+        {!reveal && tab === 'plan' && plan && !plan.blocked && <Programme plan={plan} card={x => <SessionCard key={x.id} s={x} done={doneIds.has(x.id)} open={() => setSession(x)} />} hasOwn={!!(plan.custom || s.savedPlan?.custom)} onBuild={() => setBuild(true)} onSwitch={own => act({ type: own ? 'ownPlan' : 'coachPlan' })} onNext={() => { if (confirm(plan.custom ? 'Chiudere la settimana? Il tuo piano resta uguale.' : 'Chiudere la settimana? Serie, cardio e passi si aggiornano in base agli allenamenti registrati.')) act({ type: 'week' }); }} />}
 
         {!reveal && tab === 'food' && p && n && <Diet n={n} dayKind={dayKind} setDayKind={setDayKind} edit={() => setEdit(true)} personalise={() => setDietEdit(true)} diary={!n.blocked && <FoodDiary state={s} n={n} plan={plan} act={act} />} />}
 

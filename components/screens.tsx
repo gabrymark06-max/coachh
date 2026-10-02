@@ -39,13 +39,12 @@ export function Reveal({ p, plan, n, close }: { p: Profile; plan: Plan; n: Nutri
   </section>;
 }
 
-export function Programme({ plan, hasOwn, card, onEdit, onBuild, onSwitch, onNext }: { plan: Plan; hasOwn: boolean; card: (s: Session) => ReactNode; onEdit: () => void; onBuild: () => void; onSwitch: (own: boolean) => void; onNext: () => void }) {
+export function Programme({ plan, hasOwn, card, onBuild, onSwitch, onNext }: { plan: Plan; hasOwn: boolean; card: (s: Session) => ReactNode; onBuild: () => void; onSwitch: (own: boolean) => void; onNext: () => void }) {
   const bp = plan.blueprint;
   const max = bp ? Math.max(...Object.values(bp.muscleSets), 1) : 1;
   return <>
     <Heading label={plan.custom ? `Il tuo piano · settimana ${plan.week}` : `Blocco ${plan.progress?.mesoCount ?? 1} · settimana ${plan.week}`} title="Il tuo allenamento." description={plan.custom ? 'Esercizi, serie e giorni scelti da te. Il coach ti suggerisce i carichi.' : bp?.summary ?? ''}>
       <button className="primary" onClick={onBuild}>{hasOwn ? 'Modifica il mio piano' : 'Crea il tuo piano'}</button>
-      {!plan.custom && <button className="secondary" onClick={onEdit}>Modifica risposte</button>}
     </Heading>
     <div className="segmented full planswitch" role="group" aria-label="Piano in uso">
       <button aria-pressed={!plan.custom} onClick={() => onSwitch(false)}>Piano del coach</button>
@@ -78,7 +77,6 @@ export function Diet({ n, dayKind, setDayKind, edit, personalise, diary }: { n: 
   return <>
     <Heading label="Dieta" title={n.customTargets ? 'La tua dieta.' : `Fase: ${n.phaseLabel.toLowerCase()}.`} description={n.customTargets ? 'Calorie e macro scelte da te.' : n.weeklyChange ?? ''}>
       <button className="primary" onClick={personalise}>Personalizza</button>
-      <button className="secondary" onClick={edit}>Modifica risposte</button>
     </Heading>
     {diary}
     {meals.length > 0 && <>

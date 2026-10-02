@@ -740,4 +740,98 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 .myitem .grow { display: flex; flex-direction: column; min-width: 0; }
 .myitem small { color: var(--muted); font-size: 12px; }
 .myadd { display: flex; flex-direction: column; gap: 6px; }
-.planswitch { margin: -8px 0 20px; max-width: 420px; }
+.planswitch { margin: -8px 0 20px; max-width: 420px; background: var(--steel-2); }
+
+/* Plan builder: week strip, collapsible days, compact exercises with steppers */
+.weekpick { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.weekpick button { min-height: 44px; border-radius: 12px; border: 1.5px dashed var(--line); background: #fff; font-weight: 600; font-size: 13px; color: var(--muted); }
+.weekpick button.on { border: 1.5px solid var(--graphite); background: var(--graphite); color: #fff; }
+.buildsum { font-size: 13px; color: var(--muted); margin: -2px 0 2px; }
+.builder .bday { padding: 0; gap: 0; overflow: hidden; }
+.bdayhead { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 12px 14px; text-align: left; color: inherit; cursor: pointer; }
+.bdayhead .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bdayhead b { font-size: 16px; }
+.bdayhead small { color: var(--muted); font-size: 12.5px; }
+.bdayhead .chev { color: var(--muted); transition: transform .15s ease; flex: none; }
+.bday.open .bdayhead .chev { transform: rotate(180deg); }
+.bday.open .bdayhead { border-bottom: 1px solid var(--line); }
+.daypill { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--steel); display: grid; place-items: center; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.bday.open .daypill { background: var(--graphite); color: #fff; }
+.bdaybody { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.bdayfields { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; }
+.bdayfields .field input, .bdayfields .field select { width: 100%; min-width: 0; }
+.bempty { font-size: 14px; color: var(--muted); text-align: center; padding: 10px 0; margin: 0; }
+.bexlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.builder .bex { border: 1px solid var(--line); border-radius: 12px; padding: 0; gap: 0; background: #fff; }
+.builder .bex.editing { border-color: var(--graphite); }
+.bexrow { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; padding: 10px 12px; text-align: left; color: inherit; cursor: pointer; }
+.bexrow .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bexrow b { font-weight: 600; font-size: 15px; }
+.bexrow small { color: var(--muted); font-size: 12.5px; }
+.bexrow > svg { color: var(--muted); flex: none; }
+.bexn { flex: none; width: 26px; height: 26px; border-radius: 999px; background: var(--steel); display: grid; place-items: center; font-size: 12.5px; font-weight: 600; }
+.bexedit { padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.steppers { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.stepper { display: flex; flex-direction: column; gap: 4px; }
+.stepper > span { font-size: 12px; color: var(--muted); }
+.stepper > div { display: flex; align-items: center; background: var(--steel); border-radius: 12px; padding: 3px; }
+.stepper button, .gstep button { width: 38px; height: 38px; flex: none; border: 0; border-radius: 10px; background: #fff; display: grid; place-items: center; color: var(--ink); box-shadow: 0 1px 2px #1b21281a; }
+.stepper button:disabled { opacity: .35; }
+.stepper b { flex: 1; text-align: center; font-size: 16px; }
+.hint { font-size: 12.5px; color: var(--muted); margin: -2px 0 0; }
+.bexactions { display: flex; align-items: center; gap: 6px; }
+.bexactions .ghost { margin-left: auto; }
+.danger-text { color: var(--danger) !important; display: inline-flex; align-items: center; gap: 6px; }
+.delday { align-self: center; font-size: 14px; }
+.dashed { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 48px; border: 1.5px dashed #A9B4BE; border-radius: 12px; background: none; font-weight: 600; color: var(--ink); }
+.dashed:hover { border-color: var(--graphite); }
+.savebar { position: sticky; bottom: -24px; margin: 6px -24px -24px; padding: 12px 24px calc(16px + var(--safe-b)); background: var(--paper); border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; z-index: 4; }
+.savebar .primary { flex: 1; }
+
+/* Own diet: tabs, kcal hero with macro split, gram steppers, progress bars */
+.dtabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.dtabs button { background: none; border: 0; padding: 8px 0 10px; font-weight: 600; font-size: 15px; color: var(--muted); border-bottom: 2.5px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 6px; align-items: center; }
+.dtabs button[aria-selected='true'] { color: var(--ink); border-color: var(--graphite); }
+.dtabs i { font-style: normal; font-size: 11px; background: var(--straw); color: #fff; border-radius: 999px; padding: 1px 7px; }
+.kcalhero { background: var(--graphite); color: #fff; border-radius: 16px; padding: 18px 18px 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 4px 0; }
+.kcalhero b { font-size: 40px; line-height: 1; font-weight: 600; }
+.kcalhero > span { font-size: 14px; color: #C9D1D8; }
+.kcalhero small { font-size: 12.5px; color: #9AA6B1; margin-top: 4px; }
+.macrobar { display: flex; width: 100%; height: 8px; border-radius: 999px; overflow: hidden; background: var(--graphite-3); margin-top: 12px; }
+.macrobar span { transition: width .2s ease; }
+.protein .dot, .macrobar .protein, .tbars3 .tbar:nth-child(1) .track span { background: var(--bronze); }
+.carbs .dot, .macrobar .carbs, .tbars3 .tbar:nth-child(2) .track span { background: var(--straw); }
+.fat .dot, .macrobar .fat, .tbars3 .tbar:nth-child(3) .track span { background: var(--blue); }
+.macrolist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.macroline { display: flex; align-items: center; gap: 10px; padding: 12px; }
+.macroline + .macroline { border-top: 1px solid var(--line); }
+.macroline .dot { width: 10px; height: 10px; border-radius: 999px; flex: none; }
+.macroline .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.macroline small { color: var(--muted); font-size: 12px; }
+.gstep { display: flex; align-items: center; gap: 2px; background: var(--steel); border-radius: 12px; padding: 3px; flex: none; }
+.gstep label { display: flex; align-items: baseline; gap: 2px; padding: 0 4px; }
+.gstep input { width: 48px; border: 0; background: none; font-family: var(--mono); font-size: 16px; font-weight: 600; text-align: right; padding: 0; }
+.gstep label span { font-size: 13px; color: var(--muted); }
+.gstep.small button { width: 32px; height: 32px; }
+.gstep.small input { width: 42px; font-size: 15px; }
+.copyday { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.daytargets { position: sticky; top: 64px; z-index: 3; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
+.tbars3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tbar { display: grid; grid-template-columns: 1fr auto; gap: 4px 6px; align-items: baseline; font-size: 12.5px; }
+.tbar > span:first-child { color: var(--muted); }
+.tbar b { font-size: 13px; font-weight: 600; }
+.tbar b i { font-style: normal; color: var(--muted); font-weight: 400; }
+.tbar .track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--steel); overflow: hidden; }
+.tbar .track span { display: block; height: 100%; border-radius: 999px; background: var(--ok); transition: width .2s ease; }
+.tbar.off b { color: var(--bronze-ink); }
+.tbars3 .tbar { grid-template-columns: 1fr; }
+.dieteditor .mymeal { padding: 12px; gap: 8px; }
+.dieteditor .mymeal header { align-items: center; }
+.dieteditor .mymeal header small { color: var(--muted); font-size: 13px; flex: none; }
+.dieteditor .mymeal header input { font-size: 16px; }
+.dieteditor .myitem { padding: 6px 0; border-top: 1px solid var(--steel-2); }
+.dieteditor .myitem .grow { flex: 1; }
+.dieteditor .myitem b { font-weight: 600; font-size: 14.5px; }
+.myaddsearch { display: flex; gap: 6px; align-items: center; }
+.myaddsearch .authfield { flex: 1; }
+@media (max-width: 760px) { .savebar { margin: 6px -16px -24px; padding-left: 16px; padding-right: 16px; } }
