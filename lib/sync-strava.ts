@@ -29,7 +29,8 @@ async function codeVerifier(): Promise<{ verifier: string; challenge: string }> 
 
 export async function stravaAuthUrl(): Promise<string> {
   const { verifier, challenge } = await codeVerifier();
-  sessionStorage.setItem('strava-verifier', verifier);
+  // Use localStorage so it survives full page navigations (Strava redirect)
+  localStorage.setItem('strava-verifier', verifier);
   const p = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI(),
@@ -50,7 +51,8 @@ const saveTokens = (t: Tokens) => localStorage.setItem(TK, JSON.stringify(t));
 export const clearTokens = () => localStorage.removeItem(TK);
 
 export async function exchangeCode(code: string): Promise<Tokens> {
-  const verifier = sessionStorage.getItem('strava-verifier') ?? '';
+  const verifier = localStorage.getItem('strava-verifier') ?? '';
+  localStorage.removeItem('strava-verifier'); // clean up after use
   const res = await fetch(STRAVA_TOKEN, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
