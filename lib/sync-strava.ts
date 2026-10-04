@@ -35,7 +35,7 @@ export async function stravaAuthUrl(): Promise<string> {
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI(),
     response_type: 'code',
-    scope: 'activity,athlete',
+    scope: 'activity:read',
     approval_prompt: 'auto',
     state: Math.random().toString(36).slice(2),
     code_challenge: challenge,
