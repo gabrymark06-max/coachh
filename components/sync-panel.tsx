@@ -12,7 +12,20 @@ export function SyncPanel({ state, update }: { state: AppState; update: (fn: (p:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
-  const linked = !!loadTokens();
+  const [linked, setLinked] = useState(false);
+
+  useEffect(() => {
+    // Check for callback result and update linked state
+    const result = sessionStorage.getItem('tempra-strava-result');
+    if (result) {
+      sessionStorage.removeItem('tempra-strava-result');
+      const t = loadTokens();
+      setLinked(!!t);
+      if (result !== 'ok') setError(result);
+    } else {
+      setLinked(!!loadTokens());
+    }
+  }, []);
 
   const sync = async () => {
     setBusy(true); setError(''); setDone('');
