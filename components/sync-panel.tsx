@@ -50,7 +50,7 @@ export function SyncPanel({ state, update }: { state: AppState; update: (fn: (p:
     <div><b>Garmin / Strava</b>
       <small>Porta i tuoi allenamenti sul diario di Tempra: cardio, distanza e frequenza cardiica finiscono nel diario e il coach li usa per il feedback.</small></div>
 
-    {stravaConfigured() && !linked && <button className="secondary" disabled={busy} onClick={() => { window.location.href = stravaAuthUrl(); }}><Link2 size={16} /> Collega Strava</button>}
+    {stravaConfigured() && !linked && <button className="secondary" disabled={busy} onClick={async () => { const url = await stravaAuthUrl(); window.location.href = url; }}><Link2 size={16} /> Collega Strava</button>}
     {stravaConfigured() && linked && <div className="chiprow">
       <button className="secondary" disabled={busy} onClick={sync}><RefreshCw size={16} /> {busy ? 'Sync in corso…' : 'Sync ora'}</button>
       <button className="secondary" onClick={() => { clearTokens(); location.reload(); }}><Unlink size={16} /> Scolastra Strava</button>

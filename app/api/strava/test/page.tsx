@@ -13,8 +13,8 @@ export default function StravaTest() {
     setTokens(loadTokens());
     if (stravaConfigured()) {
       // Dynamic import to avoid server-side issues
-      import('../../../../lib/sync-strava').then(m => {
-        setAuthUrl(m.stravaAuthUrl());
+      import('../../../../lib/sync-strava').then(async m => {
+        setAuthUrl(await m.stravaAuthUrl());
       });
     }
   }, []);

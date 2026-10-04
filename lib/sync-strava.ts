@@ -16,15 +16,19 @@ const REDIRECT_URI = () => process.env.NEXT_PUBLIC_STRAVA_REDIRECT ?? 'https://c
 
 export const stravaConfigured = () => CLIENT_ID !== '';
 
-function codeVerifier(): { verifier: string; challenge: string } {
-  const verifier = crypto.getRandomValues(new Uint8Array(32)).reduce((s, b) => s + String.fromCharCode(b), '');
-  const challenge = btoa(unescape(encodeURIComponent(verifier)))
+async function codeVerifier(): Promise<{ verifier: string; challenge: string }> {
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = btoa(String.fromCharCode(...verifierBytes));
+  // PKCE challenge = BASE64URL(SHA256(verifier))
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const hashBytes = new Uint8Array(hashBuffer);
+  const challenge = btoa(String.fromCharCode(...hashBytes))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   return { verifier, challenge };
 }
 
-export function stravaAuthUrl(): string {
-  const { verifier, challenge } = codeVerifier();
+export async function stravaAuthUrl(): Promise<string> {
+  const { verifier, challenge } = await codeVerifier();
   sessionStorage.setItem('strava-verifier', verifier);
   const p = new URLSearchParams({
     client_id: CLIENT_ID,
