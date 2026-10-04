@@ -12,6 +12,7 @@ import { Questionnaire, defaults } from './questionnaire';
 import { Modal } from './modal';
 import { FoodDiary } from './food/diary';
 import { Reminders } from './reminders';
+import { SyncPanel } from './sync-panel';
 import { registerWorker } from '../lib/push';
 import { watchErrors } from '../lib/report';
 import { Login } from './login';
@@ -265,7 +266,9 @@ export default function CoachApp() {
         <button className="danger" onClick={() => { if (confirm(auth === 'in' ? 'Eliminare profilo, piano, diario, misure e foto dal tuo account? Non si può annullare.' : 'Eliminare profilo, piano e diario da questo dispositivo?')) { const id = uid.current; act({ type: 'reset' }); clearPhotos(); if (id) deleteRemote(id); setEdit(false); setWelcome(true); } }}><Trash2 size={16} /> Elimina tutto</button>
       </div>
       {auth === 'in' && <Reminders />}
-      {auth === 'in' && <div className="account"><span>Account: <b>{email}</b></span><button className="secondary" onClick={logout}><LogOut size={16} /> Esci</button></div>}</>, () => setEdit(false))}
+      {auth === 'in' && <SyncPanel state={s} update={update} />}
+      {auth === 'in' && <div className="account"><span>Account: <b>{email}</b></span><button className="secondary" onClick={logout}><LogOut size={16} /> Esci</button></div>}
+    </>, () => setEdit(false))}
     {measure && modal(measure === 'new' ? 'Nuova misurazione' : 'Modifica misurazione', <MeasureForm initial={measure === 'new' ? null : measure} save={m => { if (act({ type: 'measure', data: m })) setMeasure(null); else throw Error('Controlla i valori inseriti.'); }} />, () => setMeasure(null))}
     {session && modal(session.title, <Workout key={session.exercises.map(x => x.id).join(',')} profile={p} state={s} deload={!!bp?.meso.deload} changeVariant={data => act({ type: 'variant', data: data as { sessionId: string; exerciseId: string; name: string } })} session={session} save={x => { if (act({ type: 'log', data: x as never })) setSession(null); }} />, () => setSession(null))}
     {build && modal(plan?.custom || s.savedPlan?.custom ? 'Il mio piano' : 'Crea il tuo piano', <PlanBuilder plan={plan?.custom ? plan : s.savedPlan?.custom ? s.savedPlan : plan} custom={s.customExercises ?? []} act={act} done={() => setBuild(false)} />, () => setBuild(false))}
