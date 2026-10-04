@@ -36,7 +36,7 @@ export function stravaAuthUrl(): string {
     code_challenge: challenge,
     code_challenge_method: 'S256',
   });
-  return `${STRAVA_AUTH} ?${p}`;
+  return `${STRAVA_AUTH}?${p}`;
 }
 
 interface Tokens { access_token: string; refresh_token: string; expires_at: number; account_id: number }
