@@ -12,7 +12,7 @@ const STRAVA_TOKEN = 'https://www.strava.com/oauth/token';
 const STRAVA_ACTIVITIES = 'https://api.strava.com/athlete/activities';
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID ?? '';
-const REDIRECT_URI = () => process.env.NEXT_PUBLIC_STRAVA_REDIRECT ?? `${location.origin}/api/strava/callback`;
+const REDIRECT_URI = () => process.env.NEXT_PUBLIC_STRAVA_REDIRECT ?? 'https://coachh-teal.vercel.app';
 
 export const stravaConfigured = () => CLIENT_ID !== '';
 
